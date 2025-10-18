@@ -759,9 +759,10 @@ export class LevelAnalyzer {
    * @returns {object} Window data with RMS and peak values
    */
   async calculateRMSWindows(channelData, channels, length, sampleRate, progressCallback = null) {
-    // Use actual sample rate for 50ms windows (not fixed 44.1kHz reference)
+    // IMPORTANT: Use fixed 44.1kHz reference for noise floor consistency (matches original)
+    // This ensures consistent histogram binning across different sample rates
     const windowSizeMs = 50;
-    const windowSize = Math.floor(sampleRate * (windowSizeMs / 1000));
+    const windowSize = Math.floor(44100 * (windowSizeMs / 1000)); // Fixed 44.1kHz reference
     const numWindows = Math.ceil(length / windowSize);
 
     const windowData = [];
