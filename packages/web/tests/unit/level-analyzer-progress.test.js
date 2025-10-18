@@ -353,7 +353,8 @@ describe('LevelAnalyzer - Cancellation Behavior', () => {
         await analyzer.analyzeAudioBuffer(mockAudioBuffer, progressCallback, false);
         expect(true).toBe(false); // Should not reach here
       } catch (error) {
-        expect(error.stage).toBe('noise-floor');
+        // OPTIMIZATION Phase 2: RMS windows calculated during noise floor stage
+        expect(error.stage).toBe('rms-windows');
       }
     });
   });

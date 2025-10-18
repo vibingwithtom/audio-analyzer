@@ -171,9 +171,12 @@ export class LevelAnalyzer {
         peakDb = globalPeak > 0 ? 20 * Math.log10(globalPeak) : -Infinity;
       }
 
-      // 2. Noise Floor Analysis (histogram-based, always included)
+      // 2. OPTIMIZATION (Phase 2): Calculate RMS windows once for reuse
       if (progressCallback) progressCallback('Analyzing noise floor...', LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_START);
-      const noiseFloorAnalysis = await this.analyzeNoiseFloor(channelData, channels, length, progressCallback);
+      const rmsWindows = await this.calculateRMSWindows(channelData, channels, length, sampleRate, progressCallback);
+
+      // 3. Noise Floor Analysis (uses pre-calculated RMS windows)
+      const noiseFloorAnalysis = await this.analyzeNoiseFloorFromWindows(rmsWindows, progressCallback);
 
       // 3. Normalization Check
       if (progressCallback) progressCallback('Checking normalization...', LevelAnalyzer.PROGRESS_STAGES.NORMALIZATION_START);
@@ -196,9 +199,9 @@ export class LevelAnalyzer {
         const reverbAnalysisResults = await this.estimateReverb(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, progressCallback);
         const reverbInfo = this.interpretReverb(reverbAnalysisResults.overallMedianRt60);
 
-        // Silence Analysis
+        // Silence Analysis (OPTIMIZATION Phase 2: uses pre-calculated windows)
         if (progressCallback) progressCallback('Analyzing silence...', LevelAnalyzer.PROGRESS_STAGES.SILENCE_START);
-        const { leadingSilence, trailingSilence, longestSilence, silenceSegments } = this.analyzeSilence(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, peakDb, progressCallback);
+        const { leadingSilence, trailingSilence, longestSilence, silenceSegments } = this.analyzeSilenceFromWindows(rmsWindows, sampleRate, noiseFloorAnalysis.overall, peakDb, progressCallback);
 
         // Clipping Analysis - already done in combined pass above (OPTIMIZATION)
         // No separate call needed here
@@ -238,6 +241,187 @@ export class LevelAnalyzer {
       return { time: rt60, label: 'Poor (Reverberant)', description: 'Significant reverb is present, making the recording sound distant and unprofessional.' };
     }
     return { time: rt60, label: 'Very Poor (Echoey)', description: 'Excessive echo and reverb. Unsuitable for professional voice recording.' };
+  }
+
+  /**
+   * OPTIMIZATION: Phase 2 - Silence detection from pre-calculated windows
+   * Analyzes silence using pre-calculated window peaks (no audio scanning).
+   * @param {object} rmsWindows Pre-calculated window data from calculateRMSWindows()
+   * @param {number} sampleRate Sample rate of the audio
+   * @param {number} noiseFloorDb Noise floor in dB
+   * @param {number} peakDb Peak level in dB
+   * @param {function} progressCallback Optional progress callback
+   * @returns {object} Silence analysis results
+   */
+  analyzeSilenceFromWindows(rmsWindows, sampleRate, noiseFloorDb, peakDb, progressCallback = null) {
+    const { windowData, windowSize, numWindows } = rmsWindows;
+
+    // Handle edge case: if noise floor is -Infinity (digital silence), use absolute threshold
+    let silenceThresholdDb;
+    let silenceThresholdLinear;
+
+    if (noiseFloorDb === -Infinity || !isFinite(noiseFloorDb)) {
+      silenceThresholdDb = -60;
+      silenceThresholdLinear = Math.pow(10, -60 / 20);
+    } else {
+      const dynamicRange = peakDb - noiseFloorDb;
+      const thresholdRatio = 0.25;
+      const effectiveDynamicRange = Math.max(0, dynamicRange);
+      silenceThresholdDb = noiseFloorDb + (effectiveDynamicRange * thresholdRatio);
+      silenceThresholdLinear = Math.pow(10, silenceThresholdDb / 20);
+    }
+
+    const chunkSizeMs = 50; // 50ms chunks (matches window size)
+    const minSoundDurationMs = 150;
+    const minSoundChunks = Math.ceil(minSoundDurationMs / chunkSizeMs);
+
+    const chunks = new Array(numWindows).fill(0); // 0 for silence, 1 for sound
+
+    // Step 1: Classify windows as sound or silence using pre-calculated peaks (0-40%)
+    for (let i = 0; i < numWindows; i++) {
+      if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.CHUNK_LOOP === 0) {
+        if (!this.analysisInProgress) {
+          throw new AnalysisCancelledError('Analysis cancelled', 'silence');
+        }
+        if (progressCallback) {
+          const step1Progress = (i / numWindows) * 0.4;
+          const scaledProgress = this.scaleProgress(step1Progress, LevelAnalyzer.PROGRESS_STAGES.SILENCE_START, LevelAnalyzer.PROGRESS_STAGES.SILENCE_END);
+          progressCallback('Analyzing silence...', scaledProgress);
+        }
+      }
+
+      // Use pre-calculated window peak instead of scanning samples
+      const windowPeak = windowData[i].windowPeak;
+      if (windowPeak > silenceThresholdLinear) {
+        chunks[i] = 1; // Sound
+      }
+    }
+
+    // Step 2: Filter out small "islands" of sound (40-60%)
+    let currentSoundStreak = 0;
+    for (let i = 0; i < numWindows; i++) {
+      if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.CHUNK_LOOP === 0) {
+        if (!this.analysisInProgress) {
+          throw new AnalysisCancelledError('Analysis cancelled', 'silence');
+        }
+        if (progressCallback) {
+          const step2Progress = 0.4 + (i / numWindows) * 0.2;
+          const scaledProgress = this.scaleProgress(step2Progress, LevelAnalyzer.PROGRESS_STAGES.SILENCE_START, LevelAnalyzer.PROGRESS_STAGES.SILENCE_END);
+          progressCallback('Analyzing silence...', scaledProgress);
+        }
+      }
+
+      if (chunks[i] === 1) {
+        currentSoundStreak++;
+      } else {
+        if (currentSoundStreak > 0 && currentSoundStreak < minSoundChunks) {
+          // Revert insignificant sound island to silence
+          for (let j = 1; j <= currentSoundStreak; j++) {
+            chunks[i - j] = 0;
+          }
+        }
+        currentSoundStreak = 0;
+      }
+    }
+
+    // Check for trailing sound island
+    if (currentSoundStreak > 0 && currentSoundStreak < minSoundChunks) {
+      for (let j = 1; j <= currentSoundStreak; j++) {
+        chunks[numWindows - j] = 0;
+      }
+    }
+
+    // Step 3: Find all silence segments
+    const silenceSegments = [];
+    let longestSilenceStreak = 0;
+    let currentSilenceStreak = 0;
+    let currentSilenceStart = -1;
+
+    const firstSoundIndex = chunks.indexOf(1);
+    const lastSoundIndex = chunks.lastIndexOf(1);
+
+    for (let i = 0; i < numWindows; i++) {
+      if (chunks[i] === 0) {
+        if (currentSilenceStreak === 0) {
+          currentSilenceStart = i;
+        }
+        currentSilenceStreak++;
+      } else {
+        if (currentSilenceStreak > 0) {
+          if (i > firstSoundIndex && currentSilenceStart < lastSoundIndex) {
+            const duration = currentSilenceStreak * (chunkSizeMs / 1000);
+            const startTime = currentSilenceStart * (chunkSizeMs / 1000);
+            const endTime = i * (chunkSizeMs / 1000);
+
+            silenceSegments.push({
+              startTime,
+              endTime,
+              duration
+            });
+          }
+
+          if (currentSilenceStreak > longestSilenceStreak) {
+            longestSilenceStreak = currentSilenceStreak;
+          }
+          currentSilenceStreak = 0;
+          currentSilenceStart = -1;
+        }
+      }
+    }
+
+    // Check trailing silence for longest streak
+    if (currentSilenceStreak > longestSilenceStreak) {
+      longestSilenceStreak = currentSilenceStreak;
+    }
+
+    const longestSilence = longestSilenceStreak * (chunkSizeMs / 1000);
+
+    // Step 4: Find leading and trailing silence
+    let leadingSilence = 0;
+    let trailingSilence = 0;
+
+    // Calculate total length from window data
+    const totalLength = windowData[numWindows - 1].endSample;
+
+    if (firstSoundIndex === -1) {
+      // Entire file is silent
+      leadingSilence = totalLength / sampleRate;
+      trailingSilence = totalLength / sampleRate;
+    } else {
+      leadingSilence = firstSoundIndex * (chunkSizeMs / 1000);
+      trailingSilence = (numWindows - 1 - lastSoundIndex) * (chunkSizeMs / 1000);
+
+      // Add leading silence to segments if significant
+      if (leadingSilence > 0) {
+        silenceSegments.push({
+          startTime: 0,
+          endTime: leadingSilence,
+          duration: leadingSilence,
+          type: 'leading'
+        });
+      }
+
+      // Add trailing silence to segments if significant
+      if (trailingSilence > 0) {
+        const fileEndTime = (numWindows * chunkSizeMs) / 1000;
+        silenceSegments.push({
+          startTime: fileEndTime - trailingSilence,
+          endTime: fileEndTime,
+          duration: trailingSilence,
+          type: 'trailing'
+        });
+      }
+    }
+
+    // Sort silence segments by duration (longest first)
+    silenceSegments.sort((a, b) => b.duration - a.duration);
+
+    return {
+      leadingSilence: leadingSilence,
+      trailingSilence: trailingSilence,
+      longestSilence: longestSilence,
+      silenceSegments: silenceSegments
+    };
   }
 
   analyzeSilence(channelData, channels, length, sampleRate, noiseFloorDb, peakDb, progressCallback = null) {
@@ -560,6 +744,240 @@ export class LevelAnalyzer {
     return {
       overallMedianRt60: medianRt60,
       perChannelRt60: perChannelResults
+    };
+  }
+
+  /**
+   * OPTIMIZATION: Phase 2 - Calculate RMS windows once for reuse
+   * Calculates 50ms RMS windows and peak values in a single pass.
+   * Shared by noise floor analysis and silence detection to avoid duplicate scans.
+   * @param {Array<Float32Array>} channelData Array of channel data
+   * @param {number} channels Number of channels
+   * @param {number} length Length in samples
+   * @param {number} sampleRate Sample rate (for actual 50ms calculation)
+   * @param {function} progressCallback Optional progress callback
+   * @returns {object} Window data with RMS and peak values
+   */
+  async calculateRMSWindows(channelData, channels, length, sampleRate, progressCallback = null) {
+    // Use actual sample rate for 50ms windows (not fixed 44.1kHz reference)
+    const windowSizeMs = 50;
+    const windowSize = Math.floor(sampleRate * (windowSizeMs / 1000));
+    const numWindows = Math.ceil(length / windowSize);
+
+    const windowData = [];
+    const channelNames = ['left', 'right', 'center', 'LFE', 'surroundLeft', 'surroundRight'];
+
+    // Also track per-channel RMS arrays for noise floor histogram
+    const perChannelRmsValues = [];
+    const overallRmsValues = [];
+    for (let channel = 0; channel < channels; channel++) {
+      perChannelRmsValues.push([]);
+    }
+
+    let digitalSilenceWindows = 0;
+    let windowCount = 0;
+
+    // Single pass: calculate RMS and peak for each window
+    for (let i = 0; i < length; i += windowSize) {
+      if (windowCount++ % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.WINDOW_LOOP === 0) {
+        if (!this.analysisInProgress) {
+          throw new AnalysisCancelledError('Analysis cancelled', 'rms-windows');
+        }
+        if (progressCallback) {
+          const progress = i / length;
+          const scaledProgress = this.scaleProgress(progress, LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_START, LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_END);
+          progressCallback('Analyzing noise floor...', scaledProgress);
+        }
+      }
+
+      const end = Math.min(i + windowSize, length);
+      const actualWindowSize = end - i;
+      let allChannelsSilent = true;
+      let windowPeak = 0;
+      const channelRms = [];
+
+      // Calculate per-channel RMS and overall peak
+      for (let channel = 0; channel < channels; channel++) {
+        const data = channelData[channel];
+        let sumSquares = 0;
+        let channelPeak = 0;
+
+        for (let j = i; j < end; j++) {
+          const sample = data[j];
+          const absSample = Math.abs(sample);
+
+          // RMS calculation
+          sumSquares += sample * sample;
+
+          // Peak detection (for silence)
+          if (absSample > channelPeak) {
+            channelPeak = absSample;
+          }
+        }
+
+        const rms = Math.sqrt(sumSquares / actualWindowSize);
+        channelRms.push(rms);
+
+        if (rms > 0) {
+          allChannelsSilent = false;
+          perChannelRmsValues[channel].push(rms);
+          overallRmsValues.push(rms);
+        }
+
+        // Track max peak across all channels for this window
+        if (channelPeak > windowPeak) {
+          windowPeak = channelPeak;
+        }
+      }
+
+      // Track digital silence
+      if (allChannelsSilent) {
+        digitalSilenceWindows++;
+      }
+
+      // Store window data for reuse
+      windowData.push({
+        startSample: i,
+        endSample: end,
+        channelRms: channelRms,
+        windowPeak: windowPeak,
+        isDigitalSilence: allChannelsSilent
+      });
+    }
+
+    return {
+      windowData,
+      numWindows,
+      windowSize,
+      perChannelRmsValues,
+      overallRmsValues,
+      digitalSilenceWindows
+    };
+  }
+
+  /**
+   * OPTIMIZATION: Phase 2 - Noise floor from pre-calculated windows
+   * Analyzes noise floor using pre-calculated RMS windows (no audio scanning).
+   * @param {object} rmsWindows Pre-calculated window data from calculateRMSWindows()
+   * @param {function} progressCallback Optional progress callback
+   * @returns {object} Noise floor analysis results
+   */
+  async analyzeNoiseFloorFromWindows(rmsWindows, progressCallback = null) {
+    const { NUM_BINS, MIN_DB, DB_RANGE, QUIETEST_PERCENTILE } = LevelAnalyzer.NOISE_FLOOR_CONFIG;
+    const numBins = NUM_BINS;
+    const minDb = MIN_DB;
+    const dbRange = DB_RANGE;
+    const quietestPercentile = QUIETEST_PERCENTILE;
+
+    const { perChannelRmsValues, overallRmsValues, digitalSilenceWindows, numWindows, windowData } = rmsWindows;
+    const channels = perChannelRmsValues.length;
+    const channelNames = ['left', 'right', 'center', 'LFE', 'surroundLeft', 'surroundRight'];
+
+    // Build histograms from quietest windows (reusing RMS values already calculated)
+    const perChannelResults = [];
+
+    for (let channel = 0; channel < channels; channel++) {
+      // Report progress
+      if (progressCallback) {
+        const progress = 0.7 + (channel / channels) * 0.3; // 70-100% of noise floor stage
+        const scaledProgress = this.scaleProgress(progress, LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_START, LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_END);
+        progressCallback('Analyzing noise floor...', scaledProgress);
+      }
+
+      const channelRms = perChannelRmsValues[channel];
+
+      if (channelRms.length === 0) {
+        // All windows were silence
+        perChannelResults.push({
+          channelIndex: channel,
+          channelName: channelNames[channel] || `channel ${channel}`,
+          noiseFloorDb: -Infinity
+        });
+        continue;
+      }
+
+      // Use selection algorithm to find the cutoff point
+      const cutoffIndex = Math.ceil(channelRms.length * quietestPercentile) - 1;
+      const cutoffValue = this.quickSelect([...channelRms], cutoffIndex);
+      const quietestRms = channelRms.filter(rms => rms <= cutoffValue);
+
+      // Build histogram from quietest windows only
+      const channelHistogram = new Array(numBins).fill(0);
+      for (const rms of quietestRms) {
+        const db = 20 * Math.log10(rms);
+        if (db >= minDb) {
+          const bin = Math.min(
+            Math.floor(((db - minDb) / dbRange) * numBins),
+            numBins - 1
+          );
+          channelHistogram[bin]++;
+        }
+      }
+
+      // Find the modal bin (peak of histogram)
+      let channelModeBin = -1;
+      let channelMaxCount = 0;
+      for (let i = 0; i < numBins; i++) {
+        if (channelHistogram[i] > channelMaxCount) {
+          channelMaxCount = channelHistogram[i];
+          channelModeBin = i;
+        }
+      }
+
+      const channelNoiseFloor = channelModeBin === -1
+        ? -Infinity
+        : channelModeBin * (dbRange / numBins) + minDb;
+
+      perChannelResults.push({
+        channelIndex: channel,
+        channelName: channelNames[channel] || `channel ${channel}`,
+        noiseFloorDb: channelNoiseFloor
+      });
+    }
+
+    // Overall noise floor calculation
+    let overallNoiseFloor = -Infinity;
+    if (overallRmsValues.length > 0) {
+      const cutoffIndex = Math.ceil(overallRmsValues.length * quietestPercentile) - 1;
+      const cutoffValue = this.quickSelect([...overallRmsValues], cutoffIndex);
+      const quietestRms = overallRmsValues.filter(rms => rms <= cutoffValue);
+
+      const overallHistogram = new Array(numBins).fill(0);
+      for (const rms of quietestRms) {
+        const db = 20 * Math.log10(rms);
+        if (db >= minDb) {
+          const bin = Math.min(
+            Math.floor(((db - minDb) / dbRange) * numBins),
+            numBins - 1
+          );
+          overallHistogram[bin]++;
+        }
+      }
+
+      let overallModeBin = -1;
+      let overallMaxCount = 0;
+      for (let i = 0; i < numBins; i++) {
+        if (overallHistogram[i] > overallMaxCount) {
+          overallMaxCount = overallHistogram[i];
+          overallModeBin = i;
+        }
+      }
+
+      overallNoiseFloor = overallModeBin === -1
+        ? -Infinity
+        : overallModeBin * (dbRange / numBins) + minDb;
+    }
+
+    // Calculate digital silence percentage
+    const digitalSilencePercentage = numWindows > 0
+      ? (digitalSilenceWindows / numWindows) * 100
+      : 0;
+
+    return {
+      overall: overallNoiseFloor,
+      perChannel: perChannelResults,
+      hasDigitalSilence: digitalSilenceWindows > 0,
+      digitalSilencePercentage: digitalSilencePercentage
     };
   }
 
