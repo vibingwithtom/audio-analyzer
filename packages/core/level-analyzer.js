@@ -178,7 +178,7 @@ export class LevelAnalyzer {
       // 3. Noise Floor Analysis (uses pre-calculated RMS windows)
       const noiseFloorAnalysis = await this.analyzeNoiseFloorFromWindows(rmsWindows, progressCallback);
 
-      // 3. Normalization Check
+      // 4. Normalization Check
       if (progressCallback) progressCallback('Checking normalization...', LevelAnalyzer.PROGRESS_STAGES.NORMALIZATION_START);
       const normalizationStatus = this.checkNormalization(peakDb);
 
@@ -246,6 +246,17 @@ export class LevelAnalyzer {
   /**
    * OPTIMIZATION: Phase 2 - Silence detection from pre-calculated windows
    * Analyzes silence using pre-calculated window peaks (no audio scanning).
+   *
+   * NOTE: This method is NOT currently used in Phase 2. It was implemented during optimization
+   * but caused timing mismatches for files with sample rates other than 44.1kHz due to window
+   * granularity differences. The original analyzeSilence() method is used instead (line 204)
+   * to maintain accuracy across all sample rates while Phase 2 still optimizes noise floor.
+   *
+   * This method is kept for:
+   * - Future optimization attempts with better sample rate handling
+   * - Reference implementation
+   * - Testing/validation purposes
+   *
    * @param {object} rmsWindows Pre-calculated window data from calculateRMSWindows()
    * @param {number} sampleRate Sample rate of the audio
    * @param {number} noiseFloorDb Noise floor in dB
