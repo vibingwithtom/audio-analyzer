@@ -1187,11 +1187,14 @@ export class LevelAnalyzer {
   }
 
   /**
-   * Analyzes the stereo separation of an audio buffer.
-   * @param {AudioBuffer} audioBuffer The audio buffer to analyze.
-   * @returns {object|null} An object with stereo analysis results, or null if not stereo.
+   * OPTIMIZATION: Phase 3 - Calculate stereo blocks once for reuse
+   * Calculates 250ms RMS blocks for left and right channels in a single pass.
+   * Shared by stereo separation, mic bleed, and conversational overlap analyses.
+   * @param {AudioBuffer} audioBuffer The audio buffer to analyze
+   * @param {function} progressCallback Optional progress callback
+   * @returns {Array|null} Array of block data with RMS values, or null if not stereo
    */
-  analyzeStereoSeparation(audioBuffer) {
+  calculateStereoBlocks(audioBuffer, progressCallback = null) {
     if (audioBuffer.numberOfChannels !== 2) {
       return null; // Not a stereo file
     }
@@ -1201,23 +1204,26 @@ export class LevelAnalyzer {
     const sampleRate = audioBuffer.sampleRate;
     const length = audioBuffer.length;
 
-    const blockSize = Math.floor(sampleRate * 0.25); // 250ms blocks
-    const dominanceRatioThreshold = 1.1; // How much louder one channel must be to be "dominant"
-    const silenceThreshold = 0.001; // RMS threshold for silence
+    // Skip very short files (< 1 second)
+    if (length < sampleRate) {
+      return null;
+    }
 
-    let leftDominantBlocks = 0;
-    let rightDominantBlocks = 0;
-    let balancedBlocks = 0;
-    let silentBlocks = 0;
-    let totalBlocks = 0;
+    const blockSize = Math.floor(sampleRate * 0.25); // 250ms blocks
+    const blocks = [];
+
     for (let i = 0; i < length; i += blockSize) {
-      if (totalBlocks % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.BLOCK_LOOP === 0 && !this.analysisInProgress) {
-        throw new AnalysisCancelledError('Analysis cancelled', 'stereo-separation');
+      if (blocks.length % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.BLOCK_LOOP === 0) {
+        if (!this.analysisInProgress) {
+          throw new AnalysisCancelledError('Analysis cancelled', 'stereo-blocks');
+        }
       }
-      let sumSquaresLeft = 0;
-      let sumSquaresRight = 0;
+
       const blockEnd = Math.min(i + blockSize, length);
       const currentBlockSize = blockEnd - i;
+
+      let sumSquaresLeft = 0;
+      let sumSquaresRight = 0;
 
       for (let j = i; j < blockEnd; j++) {
         sumSquaresLeft += leftChannel[j] * leftChannel[j];
@@ -1227,6 +1233,35 @@ export class LevelAnalyzer {
       const rmsLeft = Math.sqrt(sumSquaresLeft / currentBlockSize);
       const rmsRight = Math.sqrt(sumSquaresRight / currentBlockSize);
 
+      blocks.push({
+        startSample: i,
+        endSample: blockEnd,
+        rmsLeft: rmsLeft,
+        rmsRight: rmsRight
+      });
+    }
+
+    return blocks;
+  }
+
+  /**
+   * OPTIMIZATION: Phase 3 - Stereo separation from pre-calculated blocks
+   * Analyzes stereo separation using pre-calculated block RMS values.
+   * @param {Array} blocks Pre-calculated stereo blocks from calculateStereoBlocks()
+   * @returns {object} Stereo analysis results
+   */
+  analyzeStereoSeparationFromBlocks(blocks) {
+    const dominanceRatioThreshold = 1.1;
+    const silenceThreshold = 0.001;
+
+    let leftDominantBlocks = 0;
+    let rightDominantBlocks = 0;
+    let balancedBlocks = 0;
+    let silentBlocks = 0;
+    let totalBlocks = 0;
+
+    for (const block of blocks) {
+      const { rmsLeft, rmsRight } = block;
       totalBlocks++;
 
       if (rmsLeft < silenceThreshold && rmsRight < silenceThreshold) {
@@ -1260,7 +1295,6 @@ export class LevelAnalyzer {
         stereoConfidence = balancedPct;
       } else if (leftPct > 0.1 && rightPct > 0.1) {
         stereoType = 'Conversational Stereo';
-        // Confidence is based on how much of the audio is separated
         stereoConfidence = leftPct + rightPct;
       } else if (leftPct > 0.9) {
         stereoType = 'Mono in Left Channel';
@@ -1285,8 +1319,20 @@ export class LevelAnalyzer {
       rightDominantBlocks,
       balancedBlocks,
       stereoType,
-      stereoConfidence: Math.min(stereoConfidence, 1.0) // Cap at 1.0
+      stereoConfidence: Math.min(stereoConfidence, 1.0)
     };
+  }
+
+  /**
+   * Analyzes the stereo separation of an audio buffer.
+   * NOTE: Kept for backwards compatibility. New code should use calculateStereoBlocks() + analyzeStereoSeparationFromBlocks()
+   * @param {AudioBuffer} audioBuffer The audio buffer to analyze.
+   * @returns {object|null} An object with stereo analysis results, or null if not stereo.
+   */
+  analyzeStereoSeparation(audioBuffer) {
+    const blocks = this.calculateStereoBlocks(audioBuffer);
+    if (!blocks) return null;
+    return this.analyzeStereoSeparationFromBlocks(blocks);
   }
 
   /**
@@ -1586,60 +1632,30 @@ export class LevelAnalyzer {
   }
 
   /**
-   * Unified conversational audio analysis (single-pass optimization).
-   * Analyzes overlapping speech and channel consistency.
+   * OPTIMIZATION: Phase 3 - Conversational audio analysis using pre-calculated blocks
+   * Analyzes overlapping speech using shared stereo blocks.
+   * @param {Array} blocks Pre-calculated stereo blocks from calculateStereoBlocks()
+   * @param {object} noiseFloorData Noise floor data with overall and per-channel values.
+   * @returns {object} Analysis results with overlap data
+   */
+  analyzeConversationalAudioFromBlocks(blocks, noiseFloorData) {
+    const overlap = this.analyzeOverlappingSpeech(noiseFloorData, blocks);
+    return {
+      overlap
+    };
+  }
+
+  /**
+   * Unified conversational audio analysis (backwards compatible wrapper).
    * @param {AudioBuffer} audioBuffer The audio buffer to analyze.
    * @param {object} noiseFloorData Noise floor data with overall and per-channel values.
    * @param {number} peakDb Peak level in dB.
    * @returns {object|null} Combined analysis results, or null if not stereo.
    */
   analyzeConversationalAudio(audioBuffer, noiseFloorData, peakDb) {
-    // Validate inputs
-    if (!audioBuffer || audioBuffer.numberOfChannels !== 2) {
-      return null;
-    }
-
-    const leftChannel = audioBuffer.getChannelData(0);
-    const rightChannel = audioBuffer.getChannelData(1);
-    const sampleRate = audioBuffer.sampleRate;
-    const length = audioBuffer.length;
-
-    // Skip very short files (< 1 second)
-    if (length < sampleRate) {
-      return null;
-    }
-
-    // Single pass: calculate RMS blocks once for efficiency
-    const blockSize = Math.floor(sampleRate * 0.25); // 250ms blocks
-    const rmsBlocks = [];
-
-    for (let i = 0; i < length; i += blockSize) {
-      if (rmsBlocks.length % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.BLOCK_LOOP === 0 && !this.analysisInProgress) {
-        throw new AnalysisCancelledError('Analysis cancelled', 'conversational');
-      }
-      const blockEnd = Math.min(i + blockSize, length);
-      const currentBlockSize = blockEnd - i;
-
-      let sumSquaresLeft = 0;
-      let sumSquaresRight = 0;
-
-      for (let j = i; j < blockEnd; j++) {
-        sumSquaresLeft += leftChannel[j] * leftChannel[j];
-        sumSquaresRight += rightChannel[j] * rightChannel[j];
-      }
-
-      const rmsLeft = Math.sqrt(sumSquaresLeft / currentBlockSize);
-      const rmsRight = Math.sqrt(sumSquaresRight / currentBlockSize);
-
-      rmsBlocks.push({ rmsLeft, rmsRight, startSample: i, endSample: blockEnd });
-    }
-
-    // Run speech overlap analysis
-    const overlap = this.analyzeOverlappingSpeech(noiseFloorData, rmsBlocks);
-
-    return {
-      overlap
-    };
+    const blocks = this.calculateStereoBlocks(audioBuffer);
+    if (!blocks) return null;
+    return this.analyzeConversationalAudioFromBlocks(blocks, noiseFloorData);
   }
 
   /**
