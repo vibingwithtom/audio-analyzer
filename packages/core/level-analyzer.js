@@ -199,9 +199,9 @@ export class LevelAnalyzer {
         const reverbAnalysisResults = await this.estimateReverb(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, progressCallback);
         const reverbInfo = this.interpretReverb(reverbAnalysisResults.overallMedianRt60);
 
-        // Silence Analysis (OPTIMIZATION Phase 2: uses pre-calculated windows)
+        // Silence Analysis (use original method for accurate timing at all sample rates)
         if (progressCallback) progressCallback('Analyzing silence...', LevelAnalyzer.PROGRESS_STAGES.SILENCE_START);
-        const { leadingSilence, trailingSilence, longestSilence, silenceSegments } = this.analyzeSilenceFromWindows(rmsWindows, sampleRate, noiseFloorAnalysis.overall, peakDb, progressCallback);
+        const { leadingSilence, trailingSilence, longestSilence, silenceSegments } = this.analyzeSilence(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, peakDb, progressCallback);
 
         // Clipping Analysis - already done in combined pass above (OPTIMIZATION)
         // No separate call needed here
