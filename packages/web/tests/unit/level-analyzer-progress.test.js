@@ -106,7 +106,8 @@ describe('LevelAnalyzer - Progress Callbacks', () => {
       // Should include experimental stages
       expect(messages).toContain('Estimating reverb...');
       expect(messages).toContain('Analyzing silence...');
-      expect(messages).toContain('Detecting clipping...');
+      // OPTIMIZATION: Peak + Clipping combined into single pass
+      expect(messages).toContain('Analyzing peak levels and clipping...');
     });
 
     it('should not report experimental stages when includeExperimental is false', async () => {
@@ -117,7 +118,8 @@ describe('LevelAnalyzer - Progress Callbacks', () => {
       // Should NOT include experimental stages
       expect(messages).not.toContain('Estimating reverb...');
       expect(messages).not.toContain('Analyzing silence...');
-      expect(messages).not.toContain('Detecting clipping...');
+      // OPTIMIZATION: When experimental is disabled, only peak detection is done (not combined)
+      expect(messages).not.toContain('Analyzing peak levels and clipping...');
     });
 
     it('should have more progress updates with experimental analysis', async () => {
