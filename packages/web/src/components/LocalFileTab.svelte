@@ -322,7 +322,9 @@
 
           // Yield after EVERY file to give GC frequent opportunities to clean up AudioBuffers
           // Decoded AudioBuffers are huge (~250MB each) and need aggressive minor GC
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Use longer delay every 10 files to allow major GC if needed
+          const delayMs = (i + 1) % 10 === 0 ? 500 : 100;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
