@@ -116,6 +116,9 @@ export class LevelAnalyzer {
     this.analysisInProgress = true;
 
     try {
+      // Allow cancellation to take effect (yield control to event loop)
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       // 1. Combined Peak Level + Clipping Analysis (OPTIMIZATION: Single pass instead of two)
       // Only combine these if experimental analysis is enabled, otherwise just do peak detection
       let globalPeak = 0;
@@ -132,12 +135,39 @@ export class LevelAnalyzer {
         peakDb = combined.peakDb;
         clippingAnalysis = combined.clippingAnalysis;
       } else {
-        // Base analysis only: use optimized peak detection
-        console.time('[Profile] Peak Detection (Optimized)');
+        // Base analysis only: simple peak detection
+        console.time('[Profile] Peak Detection');
         if (progressCallback) progressCallback('Analyzing peak levels...', LevelAnalyzer.PROGRESS_STAGES.PEAK_START);
-        globalPeak = await this.analyzePeakLevelsOptimized(channelData, channels, length, progressCallback);
+
+        for (let channel = 0; channel < channels; channel++) {
+          const data = channelData[channel];
+          for (let i = 0; i < length; i++) {
+            const sample = Math.abs(data[i]);
+            if (sample > globalPeak) {
+              globalPeak = sample;
+            }
+
+            // Early exit if clipping found
+            if (globalPeak >= 0.99999) break;
+
+            // Cancellation check
+            if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
+              if (!this.analysisInProgress) {
+                throw new AnalysisCancelledError('Analysis cancelled', 'peak-levels');
+              }
+              if (progressCallback && i % 100000 === 0) {
+                const stageProgress = (channel * length + i) / (channels * length);
+                const scaledProgress = this.scaleProgress(stageProgress, LevelAnalyzer.PROGRESS_STAGES.PEAK_START, LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
+                progressCallback('Analyzing peak levels...', scaledProgress);
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
+            }
+          }
+          if (globalPeak >= 0.99999) break;
+        }
+
         peakDb = globalPeak > 0 ? 20 * Math.log10(globalPeak) : -Infinity;
-        console.timeEnd('[Profile] Peak Detection (Optimized)');
+        console.timeEnd('[Profile] Peak Detection');
       }
 
       // 2. OPTIMIZATION (Phase 2): Calculate RMS windows once for reuse
@@ -1847,146 +1877,6 @@ export class LevelAnalyzer {
   }
 
   /**
-   * OPTIMIZATION: Progressive Peak Detection with Subsampling (Phase 2)
-   * Three-tier approach for faster peak detection:
-   * 1. Quick scan (every 100th sample) - 99% faster
-   * 2. Medium scan (every 10th sample) - only if peak > 0.8
-   * 3. Full precision - only if peak > 0.995 (near clipping)
-   * Expected performance: 40-60% faster for typical audio
-   * @param {Float32Array[]} channelData Array of channel data
-   * @param {number} channels Number of channels
-   * @param {number} length Length of audio in samples
-   * @param {function} progressCallback Optional progress callback
-   * @returns {Promise<number>} Peak level (linear, 0.0 to 1.0)
-   */
-  async analyzePeakLevelsOptimized(channelData, channels, length, progressCallback = null) {
-    let globalPeak = 0;
-
-    // Phase 1: Quick scan (every 100th sample)
-    console.time('[Profile] Peak - Quick Scan');
-    const quickDecimation = 100;
-
-    for (let channel = 0; channel < channels; channel++) {
-      const data = channelData[channel];
-      for (let i = 0; i < length; i += quickDecimation) {
-        const sample = Math.abs(data[i]);
-        if (sample > globalPeak) {
-          globalPeak = sample;
-        }
-
-        // Early exit if we found clipping
-        if (globalPeak >= 0.99999) {
-          console.timeEnd('[Profile] Peak - Quick Scan');
-          if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-          return globalPeak;
-        }
-
-        // Cancellation check
-        if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
-          if (!this.analysisInProgress) {
-            throw new AnalysisCancelledError('Analysis cancelled', 'peak-levels');
-          }
-        }
-      }
-    }
-
-    console.timeEnd('[Profile] Peak - Quick Scan');
-    if (progressCallback) progressCallback('Quick scan complete', 0.05);
-
-    // If peak is low, we can return early
-    if (globalPeak <= 0.8) {
-      if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-      return globalPeak;
-    }
-
-    // Phase 2: Medium scan (every 10th sample) - only if peak > 0.8
-    console.time('[Profile] Peak - Medium Scan');
-    const mediumDecimation = 10;
-
-    for (let channel = 0; channel < channels; channel++) {
-      const data = channelData[channel];
-      for (let i = 0; i < length; i += mediumDecimation) {
-        const sample = Math.abs(data[i]);
-        if (sample > globalPeak) {
-          globalPeak = sample;
-        }
-
-        // Early exit if we found clipping
-        if (globalPeak >= 0.99999) {
-          console.timeEnd('[Profile] Peak - Medium Scan');
-          if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-          return globalPeak;
-        }
-
-        // Cancellation check
-        if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
-          if (!this.analysisInProgress) {
-            throw new AnalysisCancelledError('Analysis cancelled', 'peak-levels');
-          }
-        }
-      }
-    }
-
-    console.timeEnd('[Profile] Peak - Medium Scan');
-    if (progressCallback) progressCallback('Medium scan complete', 0.10);
-
-    // If peak is not very close to clipping, return medium scan result
-    if (globalPeak <= 0.995) {
-      if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-      return globalPeak;
-    }
-
-    // Phase 3: Full precision scan with block processing - only if peak > 0.995
-    console.time('[Profile] Peak - Full Scan');
-    const blockSize = 1024; // Process in 1KB blocks for better cache locality
-
-    for (let channel = 0; channel < channels; channel++) {
-      const data = channelData[channel];
-
-      // Process in blocks for better cache performance
-      for (let blockStart = 0; blockStart < length; blockStart += blockSize) {
-        const blockEnd = Math.min(blockStart + blockSize, length);
-
-        // Find max in this block
-        for (let i = blockStart; i < blockEnd; i++) {
-          const sample = Math.abs(data[i]);
-          if (sample > globalPeak) {
-            globalPeak = sample;
-          }
-        }
-
-        // Early exit if we found clipping
-        if (globalPeak >= 0.99999) {
-          console.timeEnd('[Profile] Peak - Full Scan');
-          if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-          return globalPeak;
-        }
-
-        // Progress updates (check at block boundaries)
-        if (blockStart % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
-          if (!this.analysisInProgress) {
-            throw new AnalysisCancelledError('Analysis cancelled', 'peak-levels');
-          }
-
-          const stageProgress = (channel * length + blockStart) / (channels * length);
-          const scaledProgress = this.scaleProgress(stageProgress, LevelAnalyzer.PROGRESS_STAGES.PEAK_START, LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-          if (progressCallback) progressCallback('Full precision scan...', scaledProgress);
-
-          // Allow UI to update
-          if (blockStart % 100000 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 1));
-          }
-        }
-      }
-    }
-
-    console.timeEnd('[Profile] Peak - Full Scan');
-    if (progressCallback) progressCallback('Peak detected', LevelAnalyzer.PROGRESS_STAGES.PEAK_END);
-
-    return globalPeak;
-  }
-
-  /**
    * OPTIMIZATION: Combined Peak and Clipping Analysis (Phase 1)
    * Combines peak level detection and clipping analysis into a single pass.
    * Reduces experimental analysis time by ~10% by eliminating one full audio scan.
@@ -1998,6 +1888,80 @@ export class LevelAnalyzer {
   async analyzePeakAndClipping(audioBuffer, sampleRate, progressCallback = null) {
     const channels = audioBuffer.numberOfChannels;
     const length = audioBuffer.length;
+
+    // Check cancellation before starting any work
+    if (!this.analysisInProgress) {
+      throw new AnalysisCancelledError('Analysis cancelled', 'peak-clipping-combined');
+    }
+
+    // OPTIMIZATION: Quick peak scan first to determine if clipping analysis is needed
+    console.time('[Profile] Peak - Quick Scan');
+    let quickPeak = 0;
+    const quickDecimation = 100;
+
+    for (let channel = 0; channel < channels; channel++) {
+      const data = audioBuffer.getChannelData(channel);
+      for (let i = 0; i < length; i += quickDecimation) {
+        const sample = Math.abs(data[i]);
+        if (sample > quickPeak) {
+          quickPeak = sample;
+        }
+        if (quickPeak >= 0.99999) break; // Early exit if clipping found
+
+        // Cancellation check
+        if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
+          if (!this.analysisInProgress) {
+            throw new AnalysisCancelledError('Analysis cancelled', 'peak-clipping-combined');
+          }
+        }
+      }
+      if (quickPeak >= 0.99999) break;
+    }
+    console.timeEnd('[Profile] Peak - Quick Scan');
+
+    // If quick scan shows peak < 0.9 (~-1dB), clipping is impossible
+    // Skip expensive clipping analysis and just do accurate peak detection
+    if (quickPeak < 0.9) {
+      console.time('[Profile] Peak - Full Scan (No Clipping)');
+      let globalPeak = 0;
+
+      for (let channel = 0; channel < channels; channel++) {
+        const data = audioBuffer.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+          const sample = Math.abs(data[i]);
+          if (sample > globalPeak) {
+            globalPeak = sample;
+          }
+
+          // Cancellation check
+          if (i % LevelAnalyzer.CANCELLATION_CHECK_INTERVALS.SAMPLE_LOOP === 0) {
+            if (!this.analysisInProgress) {
+              throw new AnalysisCancelledError('Analysis cancelled', 'peak-levels');
+            }
+            if (progressCallback && i % 100000 === 0) {
+              const stageProgress = (channel * length + i) / (channels * length);
+              const scaledProgress = this.scaleProgress(stageProgress, LevelAnalyzer.PROGRESS_STAGES.PEAK_START, LevelAnalyzer.PROGRESS_STAGES.CLIPPING_END);
+              progressCallback('Analyzing peak levels...', scaledProgress);
+              await new Promise(resolve => setTimeout(resolve, 1));
+            }
+          }
+        }
+      }
+
+      const peakDb = globalPeak > 0 ? 20 * Math.log10(globalPeak) : -Infinity;
+      console.timeEnd('[Profile] Peak - Full Scan (No Clipping)');
+
+      // Return with null clipping analysis (no clipping possible at this level)
+      return {
+        globalPeak,
+        peakDb,
+        clippingAnalysis: null
+      };
+    }
+
+    // Quick scan shows peak >= 0.9, clipping is possible
+    // Do full combined peak + clipping analysis
+    console.time('[Profile] Peak & Clipping - Full Combined Scan');
 
     // Peak detection variables
     let globalPeak = 0;
@@ -2232,6 +2196,8 @@ export class LevelAnalyzer {
       if (a.type === 'near' && b.type === 'hard') return 1;
       return b.duration - a.duration;
     });
+
+    console.timeEnd('[Profile] Peak & Clipping - Full Combined Scan');
 
     return {
       // Peak analysis results
