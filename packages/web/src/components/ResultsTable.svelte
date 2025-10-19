@@ -5,7 +5,7 @@
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
 
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   const {
     results = [],
@@ -25,6 +25,34 @@
   let hasHorizontalScroll = $state(false);
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
+
+  // Lazy blob URL management - create on-demand to prevent memory buildup
+  const blobUrlCache = new Map<string, string>(); // filename -> blob URL
+
+  function getAudioUrl(result: AudioResults): string | null {
+    // Use existing audioUrl if available
+    if (result.audioUrl) return result.audioUrl;
+
+    // Check if File reference exists for lazy creation
+    const file = (result as any).file;
+    if (!file) return null;
+
+    // Check cache first
+    if (blobUrlCache.has(result.filename)) {
+      return blobUrlCache.get(result.filename)!;
+    }
+
+    // Create blob URL and cache it
+    const blobUrl = URL.createObjectURL(file);
+    blobUrlCache.set(result.filename, blobUrl);
+    return blobUrl;
+  }
+
+  // Cleanup blob URLs on component destroy
+  onDestroy(() => {
+    blobUrlCache.forEach(url => URL.revokeObjectURL(url));
+    blobUrlCache.clear();
+  });
 
   // Check if table has horizontal scroll and which direction
   function checkScroll() {
@@ -1071,8 +1099,8 @@
               {formatBytes(result.fileSize)}
             </td>
             <td>
-              {#if result.audioUrl}
-                <audio controls src={result.audioUrl}></audio>
+              {#if getAudioUrl(result)}
+                <audio controls src={getAudioUrl(result)}></audio>
               {:else if result.externalUrl}
                 <a href={result.externalUrl} target="_blank" rel="noopener noreferrer" class="external-link-btn" title="View in Box/Google Drive">
                   ▶

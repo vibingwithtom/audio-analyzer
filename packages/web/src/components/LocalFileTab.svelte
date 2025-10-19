@@ -280,9 +280,8 @@
           const progressCallback = createProgressCallback(file.name, i + 1, files.length);
           const result = await processSingleFile(file, true, progressCallback);
 
-          // Create blob URL for audio playback in batch mode
-          const blobUrl = URL.createObjectURL(file);
-          result.audioUrl = blobUrl;
+          // Store File reference for lazy blob URL creation (prevents memory buildup)
+          (result as any).file = file;
 
           batchResults = [...batchResults, result];
 
