@@ -43,7 +43,18 @@ export class SettingsManager {
    * Saves criteria settings to localStorage
    */
   static saveCriteria(criteria: AudioCriteria): void {
-    const settings: AppSettings = { criteria };
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    let settings: AppSettings = {};
+
+    if (stored) {
+      try {
+        settings = JSON.parse(stored);
+      } catch (error) {
+        console.warn('Failed to parse existing settings, creating new:', error);
+      }
+    }
+
+    settings.criteria = criteria;
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }
 

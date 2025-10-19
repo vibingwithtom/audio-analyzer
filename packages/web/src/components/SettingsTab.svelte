@@ -709,27 +709,36 @@
           aria-pressed={$enableIncludeRecommendations}
         ></button>
       </div>
+    </div>
+  </div>
 
-      <!-- Peak Detection Mode Toggle -->
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-primary, #ffffff); border-radius: 4px; border: 1px solid var(--border-color, #e0e0e0);">
-        <div style="flex: 1;">
-          <div style="font-weight: 500; color: var(--text-primary, #333333);">Fast Peak Detection (Experimental)</div>
-          <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); margin-top: 0.25rem;">
-            {#if $peakDetectionMode === 'fast'}
-              ⚡ Speed mode: 60% faster, samples every 5th sample (~0.3-0.5dB typical error)
-            {:else}
-              🎯 Accurate mode: 100% precise, scans every sample (slower)
-            {/if}
-          </div>
+  <!-- Analysis Settings Section -->
+  <div class="settings-section">
+    <h3>Analysis Settings</h3>
+
+    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666666); font-size: 0.9rem;">
+      Configure how audio files are analyzed in experimental mode.
+    </p>
+
+    <!-- Peak Detection Mode Toggle -->
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-primary, #ffffff); border-radius: 4px; border: 1px solid var(--border-color, #e0e0e0);">
+      <div style="flex: 1;">
+        <div style="font-weight: 500; color: var(--text-primary, #333333);">Fast Peak Detection (Experimental)</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); margin-top: 0.25rem;">
+          {#if $peakDetectionMode === 'fast'}
+            ⚡ Speed mode: 60% faster, samples every 5th sample (~0.3-0.5dB typical error)
+          {:else}
+            🎯 Accurate mode: 100% precise, scans every sample (slower)
+          {/if}
         </div>
-        <button
-          class="toggle-switch"
-          class:active={$peakDetectionMode === 'fast'}
-          on:click={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
-          aria-label="Toggle peak detection mode"
-          aria-pressed={$peakDetectionMode === 'fast'}
-        ></button>
       </div>
+      <button
+        class="toggle-switch"
+        class:active={$peakDetectionMode === 'fast'}
+        on:click={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
+        aria-label="Toggle peak detection mode"
+        aria-pressed={$peakDetectionMode === 'fast'}
+      ></button>
     </div>
   </div>
 </div>
