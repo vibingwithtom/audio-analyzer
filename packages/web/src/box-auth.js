@@ -10,12 +10,8 @@ class BoxAuth {
   async init() {
     if (this.isInitialized) return;
 
-    console.log('[Box Auth] Init started at:', new Date().toISOString());
-
     // Check if we're returning from OAuth callback
     await this.handleOAuthCallback();
-
-    console.log('[Box Auth] Init completed at:', new Date().toISOString());
 
     this.isInitialized = true;
   }
@@ -25,7 +21,6 @@ class BoxAuth {
     const params = new URLSearchParams(window.location.search);
 
     if (params.has('code')) {
-      console.log('[Box OAuth] Callback received at:', new Date().toISOString());
       const code = params.get('code');
       const state = params.get('state');
 
@@ -36,13 +31,9 @@ class BoxAuth {
         return false;
       }
 
-      console.log('[Box OAuth] State verified, exchanging code at:', new Date().toISOString());
-
       try {
         // Exchange the code for an access token via our Cloud Function
         const tokenResponse = await fetch(`${BOX_CONFIG.PROXY_URL}?action=token&code=${encodeURIComponent(code)}`);
-
-        console.log('[Box OAuth] Token exchange response at:', new Date().toISOString(), 'Status:', tokenResponse.status);
 
         if (!tokenResponse.ok) {
           const errorText = await tokenResponse.text();
@@ -152,14 +143,12 @@ class BoxAuth {
     try {
       // Use authenticated access with Box API
       const token = await this.getValidToken();
-      console.log('[Box Download] Token retrieved:', token ? 'Yes' : 'No', 'Expires at:', new Date(token.expires_at).toISOString());
 
       const headers = {
         'Authorization': `Bearer ${token.access_token}`
       };
 
       // First get file metadata
-      console.log('[Box Download] Fetching metadata for file:', fileId);
       const metaResponse = await fetch(
         `${BOX_CONFIG.API_URL}/files/${fileId}`,
         { headers }
@@ -176,10 +165,8 @@ class BoxAuth {
       }
 
       const metadata = await metaResponse.json();
-      console.log('[Box Download] Metadata retrieved:', metadata.name);
 
       // Download the actual file
-      console.log('[Box Download] Downloading file content...');
       const fileResponse = await fetch(
         `${BOX_CONFIG.API_URL}/files/${fileId}/content`,
         { headers }
