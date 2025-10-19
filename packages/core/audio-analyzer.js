@@ -320,4 +320,16 @@ export class AudioAnalyzer {
 
     return 'Unknown';
   }
+
+  /**
+   * Clean up AudioContext resources.
+   * Should be called when the analyzer is no longer needed to prevent resource leaks.
+   */
+  cleanup() {
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.audioBuffer = null;
+  }
 }

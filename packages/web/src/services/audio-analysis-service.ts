@@ -181,91 +181,97 @@ async function analyzeFullFile(
 
   // Basic audio analysis
   const audioAnalyzer = new AudioAnalyzer();
-  const basicResults = await audioAnalyzer.analyzeFile(file);
 
-  // Use actualSize if available (for partial downloads), otherwise use file.size
-  const actualSize = (file as any).actualSize || file.size;
+  try {
+    const basicResults = await audioAnalyzer.analyzeFile(file);
 
-  let result: AudioResults = {
-    filename,
-    status: 'pass',
-    sampleRate: 0,
-    bitDepth: 0,
-    channels: 0,
-    duration: 0,
-    fileSize: actualSize,
-    ...(basicResults as any)  // Spread after defaults so basicResults can override
-  };
+    // Use actualSize if available (for partial downloads), otherwise use file.size
+    const actualSize = (file as any).actualSize || file.size;
 
-  // Report progress after basic analysis
-  if (progressCallback) {
-    progressCallback('Validating properties...', 0.5);
-  }
+    let result: AudioResults = {
+      filename,
+      status: 'pass',
+      sampleRate: 0,
+      bitDepth: 0,
+      channels: 0,
+      duration: 0,
+      fileSize: actualSize,
+      ...(basicResults as any)  // Spread after defaults so basicResults can override
+    };
 
-  // Advanced/Experimental analysis
-  if (mode === 'experimental') {
-    const arrayBuffer = await file.arrayBuffer();
-    const advancedResults = await analyzeExperimental(arrayBuffer, progressCallback);
-    result = { ...result, ...advancedResults };
-
-    // Track experimental feature usage
-    analyticsService.track('experimental_analysis_used', {
-      hasStereoSeparation: !!advancedResults.stereoSeparation,
-      stereoType: advancedResults.stereoSeparation?.stereoType,
-      hasMicBleed: !!advancedResults.micBleed,
-      hasReverb: !!advancedResults.reverbInfo,
-      hasNoiseFloor: advancedResults.noiseFloorDb !== undefined,
-      hasSilenceDetection: !!advancedResults.silenceInfo,
-    });
-  }
-
-  // Validation against preset criteria
-  if (criteria) {
-    const skipAudioValidation = mode === 'filename-only';
-    const validation = CriteriaValidator.validateResults(result, criteria, skipAudioValidation) as unknown as ValidationResults;
-
-    // Add filename validation if preset supports it
-    if (preset?.filenameValidationType && (mode === 'filename-only' || mode === 'full')) {
-      const filenameValidation = validateFilename(filename, preset, presetId, scriptsList, speakerId);
-      if (filenameValidation && validation) {
-        (validation as any).filename = filenameValidation;
-      }
+    // Report progress after basic analysis
+    if (progressCallback) {
+      progressCallback('Validating properties...', 0.5);
     }
 
-    // Add stereo type validation in experimental mode if preset requires it
-    if (preset?.stereoType && preset.stereoType.length > 0 && mode === 'experimental' && validation) {
-      const stereoValidation = CriteriaValidator.validateStereoType(result.stereoSeparation, preset) as any;
-      if (stereoValidation) {
-        (validation as any).stereoType = {
-          status: stereoValidation.status as 'pass' | 'fail' | 'warning',
-          value: stereoValidation.message as string,
-          issue: stereoValidation.status === 'fail' ? (stereoValidation.message as string) : undefined
-        };
-      }
+    // Advanced/Experimental analysis
+    if (mode === 'experimental') {
+      const arrayBuffer = await file.arrayBuffer();
+      const advancedResults = await analyzeExperimental(arrayBuffer, progressCallback);
+      result = { ...result, ...advancedResults };
+
+      // Track experimental feature usage
+      analyticsService.track('experimental_analysis_used', {
+        hasStereoSeparation: !!advancedResults.stereoSeparation,
+        stereoType: advancedResults.stereoSeparation?.stereoType,
+        hasMicBleed: !!advancedResults.micBleed,
+        hasReverb: !!advancedResults.reverbInfo,
+        hasNoiseFloor: advancedResults.noiseFloorDb !== undefined,
+        hasSilenceDetection: !!advancedResults.silenceInfo,
+      });
     }
 
-    // Add speech overlap validation in experimental mode if preset defines thresholds
-    if (preset?.maxOverlapWarning !== undefined && preset?.maxOverlapFail !== undefined && mode === 'experimental' && validation) {
-      const overlapValidation = CriteriaValidator.validateSpeechOverlap(result.conversationalAnalysis as any, preset) as any;
-      if (overlapValidation) {
-        (validation as any).speechOverlap = {
-          status: overlapValidation.status as 'pass' | 'fail' | 'warning',
-          value: overlapValidation.message as string,
-          issue: overlapValidation.status !== 'pass' ? (overlapValidation.message as string) : undefined
-        };
+    // Validation against preset criteria
+    if (criteria) {
+      const skipAudioValidation = mode === 'filename-only';
+      const validation = CriteriaValidator.validateResults(result, criteria, skipAudioValidation) as unknown as ValidationResults;
+
+      // Add filename validation if preset supports it
+      if (preset?.filenameValidationType && (mode === 'filename-only' || mode === 'full')) {
+        const filenameValidation = validateFilename(filename, preset, presetId, scriptsList, speakerId);
+        if (filenameValidation && validation) {
+          (validation as any).filename = filenameValidation;
+        }
       }
+
+      // Add stereo type validation in experimental mode if preset requires it
+      if (preset?.stereoType && preset.stereoType.length > 0 && mode === 'experimental' && validation) {
+        const stereoValidation = CriteriaValidator.validateStereoType(result.stereoSeparation, preset) as any;
+        if (stereoValidation) {
+          (validation as any).stereoType = {
+            status: stereoValidation.status as 'pass' | 'fail' | 'warning',
+            value: stereoValidation.message as string,
+            issue: stereoValidation.status === 'fail' ? (stereoValidation.message as string) : undefined
+          };
+        }
+      }
+
+      // Add speech overlap validation in experimental mode if preset defines thresholds
+      if (preset?.maxOverlapWarning !== undefined && preset?.maxOverlapFail !== undefined && mode === 'experimental' && validation) {
+        const overlapValidation = CriteriaValidator.validateSpeechOverlap(result.conversationalAnalysis as any, preset) as any;
+        if (overlapValidation) {
+          (validation as any).speechOverlap = {
+            status: overlapValidation.status as 'pass' | 'fail' | 'warning',
+            value: overlapValidation.message as string,
+            issue: overlapValidation.status !== 'pass' ? (overlapValidation.message as string) : undefined
+          };
+        }
+      }
+
+      result.validation = validation;
+      result.status = determineOverallStatus(validation);
     }
 
-    result.validation = validation;
-    result.status = determineOverallStatus(validation);
-  }
+    // Report completion
+    if (progressCallback) {
+      progressCallback('Analysis complete', 1.0);
+    }
 
-  // Report completion
-  if (progressCallback) {
-    progressCallback('Analysis complete', 1.0);
+    return result;
+  } finally {
+    // Close AudioContext to prevent resource leaks in batch processing
+    audioAnalyzer.cleanup();
   }
-
-  return result;
 }
 
 /**
@@ -320,6 +326,8 @@ async function analyzeExperimental(
   } finally {
     (levelAnalyzer as any).analysisInProgress = false;
     activeLevelAnalyzers.delete(levelAnalyzer);
+    // Close AudioContext to prevent resource leaks in batch processing
+    audioContext.close();
   }
 }
 

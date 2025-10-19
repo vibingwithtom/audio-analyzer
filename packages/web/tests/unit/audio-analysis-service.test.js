@@ -68,7 +68,8 @@ describe('audio-analysis-service', () => {
         bitDepth: 24,
         channels: 2,
         duration: 120
-      })
+      }),
+      cleanup: vi.fn()
     };
 
     AudioAnalyzer.mockImplementation(() => mockAudioAnalyzer);
@@ -341,7 +342,8 @@ describe('audio-analysis-service', () => {
           sampleRate: 48000,
           numberOfChannels: 2,
           duration: 120
-        })
+        }),
+        close: vi.fn()
       }));
     });
 
@@ -580,7 +582,8 @@ describe('audio-analysis-service', () => {
           sampleRate: 48000,
           numberOfChannels: 2,
           duration: 120
-        })
+        }),
+        close: vi.fn()
       }));
 
       const result = await analyzeAudioFile(mockFile, {
