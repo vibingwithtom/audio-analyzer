@@ -293,8 +293,11 @@
           const fileProcessTime = fileEndTime - fileStartTime;
           const gapSinceLastFile = fileStartTime - lastFileTime;
 
-          // Store File reference for lazy blob URL creation (prevents memory buildup)
-          (result as any).file = file;
+          // Store File reference for lazy blob URL creation ONLY if audio playback is shown
+          // In experimental mode, no audio player is displayed, so don't keep 6GB of files in memory!
+          if ($analysisMode !== 'experimental') {
+            (result as any).file = file;
+          }
 
           // Accumulate results
           tempResults.push(result);
