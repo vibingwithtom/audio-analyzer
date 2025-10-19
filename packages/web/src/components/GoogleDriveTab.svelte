@@ -186,17 +186,6 @@
         const currentResults = batchResults.length > 0 ? batchResults : results;
         const isStale = areResultsStaleForMode(currentResults, $analysisMode, currentPreset);
 
-        // Debug logging
-        console.log('Staleness Check:', {
-          resultsMode,
-          newMode: $analysisMode,
-          isStale,
-          isBatch: batchResults.length > 0,
-          hasValidatedAudio: results ? hasValidatedAudioProperties(results) : (batchResults.length > 0 ? hasValidatedAudioProperties(batchResults[0]) : false),
-          hasFilename: results ? hasFilenameValidation(results) : (batchResults.length > 0 ? hasFilenameValidation(batchResults[0]) : false),
-          hasExperimental: results ? hasExperimentalMetrics(results) : (batchResults.length > 0 ? hasExperimentalMetrics(batchResults[0]) : false)
-        });
-
         resultsStale = isStale;
       }
     }

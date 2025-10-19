@@ -140,16 +140,6 @@
         const currentResults = isBatchMode ? batchResults : results;
         const isStale = areResultsStaleForMode(currentResults, $analysisMode, currentPreset);
 
-        // Debug logging
-        console.log('Staleness Check:', {
-          resultsMode,
-          newMode: $analysisMode,
-          isStale,
-          hasValidatedAudio: results ? hasValidatedAudioProperties(results) : (batchResults.length > 0 ? hasValidatedAudioProperties(batchResults[0]) : false),
-          hasFilename: results ? hasFilenameValidation(results) : (batchResults.length > 0 ? hasFilenameValidation(batchResults[0]) : false),
-          hasExperimental: results ? hasExperimentalMetrics(results) : (batchResults.length > 0 ? hasExperimentalMetrics(batchResults[0]) : false)
-        });
-
         resultsStale = isStale;
       }
     }
@@ -185,8 +175,6 @@
       validation = analysisResults.validation || null;
       resultsMode = $analysisMode;
 
-      console.log('Results set:', results);
-
     } catch (err) {
       console.error('Error in processFile:', err);
       if (err instanceof AnalysisCancelledError) {
@@ -197,7 +185,6 @@
       }
       error = err instanceof Error ? err.message : 'Unknown error occurred';
       results = null;
-      console.log('Error set:', error);
     } finally {
       processing = false;
       analysisProgress.visible = false;
@@ -212,30 +199,23 @@
   }
 
   async function handleFileChange(event: CustomEvent) {
-    console.log('handleFileChange called', event);
     // Get the original event from the CustomEvent detail
     const originalEvent = event.detail as Event;
     const inputElement = originalEvent.target as HTMLInputElement;
     const files = inputElement?.files;
-
-    console.log('Files selected:', files?.length);
 
     if (!files || files.length === 0) return;
 
     // Convert FileList to array
     const filesArray = Array.from(files);
 
-    console.log('Files array:', filesArray.length, filesArray);
-
     if (filesArray.length === 1) {
       // Single file mode
-      console.log('Single file mode');
       isBatchMode = false;
       batchResults = [];
       await processFile(filesArray[0]);
     } else {
       // Batch mode
-      console.log('Batch mode - processing', filesArray.length, 'files');
       isBatchMode = true;
       results = null;
       await processBatchFiles(filesArray);
