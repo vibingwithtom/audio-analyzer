@@ -267,6 +267,10 @@
       const tempResults: AudioResults[] = [];
       const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
 
+      // Performance profiling
+      let lastFileTime = performance.now();
+      const memoryAvailable = 'memory' in performance;
+
       for (let i = 0; i < files.length; i++) {
         // Check if cancel was requested
         if (cancelRequested) {
@@ -278,10 +282,16 @@
         processedFiles = i + 1;
 
         try {
+          const fileStartTime = performance.now();
+
           // Reset progress to 0 for new file
           analysisProgress.progress = 0;
           const progressCallback = createProgressCallback(file.name, i + 1, files.length);
           const result = await processSingleFile(file, true, progressCallback);
+
+          const fileEndTime = performance.now();
+          const fileProcessTime = fileEndTime - fileStartTime;
+          const gapSinceLastFile = fileStartTime - lastFileTime;
 
           // Store File reference for lazy blob URL creation (prevents memory buildup)
           (result as any).file = file;
@@ -294,6 +304,21 @@
             batchResults = [...batchResults, ...tempResults];
             tempResults.length = 0; // Clear temp array
           }
+
+          // Performance logging
+          const memInfo = memoryAvailable ? (performance as any).memory : null;
+          const memoryMB = memInfo ? (memInfo.usedJSHeapSize / 1024 / 1024).toFixed(0) : 'N/A';
+          const freezeDetected = gapSinceLastFile > 1000; // Gap >1s indicates freeze/GC
+
+          console.log(
+            `[Batch Profile] File ${i + 1}/${files.length} | ` +
+            `Process: ${fileProcessTime.toFixed(0)}ms | ` +
+            `Gap: ${gapSinceLastFile.toFixed(0)}ms ${freezeDetected ? '🔴 FREEZE!' : ''} | ` +
+            `Memory: ${memoryMB}MB | ` +
+            `${file.name}`
+          );
+
+          lastFileTime = performance.now();
 
           // Yield after EVERY file to give GC frequent opportunities to clean up AudioBuffers
           // Decoded AudioBuffers are huge (~250MB each) and need aggressive minor GC
