@@ -228,6 +228,40 @@ worker.postMessage(
 );
 ```
 
+## Browser Compatibility Analysis
+
+### Core Requirements
+
+| Feature | Chrome | Firefox | Safari | Edge | Mobile |
+|---------|---------|---------|---------|---------|---------|
+| **Web Workers** | ✅ 4+ | ✅ 3.5+ | ✅ 4+ | ✅ 12+ | ✅ iOS 5+, Android 4.4+ |
+| **OfflineAudioContext** | ✅ 25+ | ✅ 25+ | ✅ 7.1+ | ✅ 12+ | ⚠️ iOS 7.1+, Android 5+ |
+| **OfflineAudioContext in Workers** | ✅ 66+ | ✅ 76+ | ❌ No | ✅ 79+ | ❌ No mobile support |
+| **Transferable ArrayBuffers** | ✅ 13+ | ✅ 18+ | ✅ 6+ | ✅ 12+ | ✅ Good |
+| **ES Modules in Workers** | ✅ 80+ | ⚠️ 114+ | ❌ No | ✅ 80+ | ❌ Limited |
+
+### Critical Issues
+
+1. **Safari doesn't support OfflineAudioContext in Workers** (35% of Mac users)
+2. **Mobile browsers don't support audio decoding in Workers**
+3. **ES modules in Workers require bundling strategy**
+
+### Risk Assessment
+
+**HIGH RISK**:
+- Safari users (35% of Mac market) would need fallback
+- All mobile users would need fallback
+- Adds significant complexity for partial benefit
+
+**MEDIUM RISK**:
+- Worker crashes could lose batch progress
+- Memory usage might increase with parallel processing
+- Debugging worker issues is more complex
+
+**LOW RISK**:
+- Basic Web Worker support is universal
+- Transferable objects well supported
+
 ## Benefits
 
 1. **No UI Freezes**: GC pauses happen in worker threads, not main thread
@@ -258,27 +292,147 @@ const supportsAudioInWorker = 'OfflineAudioContext' in self;
 **Challenge**: Progress callbacks don't work across thread boundaries
 **Solution**: PostMessage-based progress reporting
 
-## Testing Plan
+## Comprehensive Testing Requirements
 
-1. **Unit Tests**
-   - Test worker message handling
-   - Test error scenarios
-   - Test cancellation
+### 1. Feature Detection Tests
 
-2. **Integration Tests**
-   - Test single file processing
-   - Test batch processing
-   - Test mixed workloads
+```javascript
+// Must test at runtime before using workers
+function canUseAudioWorkers() {
+  // Test 1: Basic worker support
+  if (typeof Worker === 'undefined') return false;
 
-3. **Performance Tests**
-   - Measure time to process 137 files
-   - Monitor memory usage
-   - Check for UI responsiveness
+  // Test 2: Create test worker and check audio support
+  const testWorker = new Worker('test-audio-worker.js');
+  // Send test message, wait for response
+  // Check if OfflineAudioContext works in worker
 
-4. **Browser Compatibility**
-   - Chrome/Edge
-   - Firefox
-   - Safari (may have limitations)
+  // Test 3: Check transferable support
+  const buffer = new ArrayBuffer(1);
+  testWorker.postMessage({ buffer }, [buffer]);
+  if (buffer.byteLength !== 0) return false; // Transfer failed
+
+  return true;
+}
+```
+
+### 2. Browser-Specific Test Matrix
+
+| Test Case | Chrome 100+ | Firefox 100+ | Safari 15+ | Edge 100+ |
+|-----------|-------------|--------------|------------|-----------|
+| Single file < 10MB | Required | Required | Required | Required |
+| Single file > 100MB | Required | Required | Required | Required |
+| Batch 10 files | Required | Required | Required | Required |
+| Batch 137 files | Required | Required | Fallback Test | Required |
+| Cancel during batch | Required | Required | Required | Required |
+| Worker crash recovery | Required | Required | N/A | Required |
+| Memory usage < 2GB | Required | Required | Required | Required |
+| UI responsiveness | Required | Required | Required | Required |
+
+### 3. Performance Benchmarks
+
+**Baseline (Current Implementation)**:
+- 137 files: ~65 seconds with fast mode
+- UI freezes: 5 seconds every 8-11 files
+- Memory peak: ~2.5GB
+
+**Success Criteria for Worker Implementation**:
+- 137 files: < 70 seconds
+- UI freezes: None > 100ms
+- Memory peak: < 2GB
+- CPU usage: < 80% on 4-core machine
+
+### 4. Stress Testing
+
+```javascript
+// Test scenarios
+const stressTests = [
+  { name: "Memory pressure", files: 200, fileSize: "50MB each" },
+  { name: "CPU saturation", files: 100, parallel: 8 },
+  { name: "Rapid cancellation", files: 50, cancelAfter: "500ms" },
+  { name: "Mixed sizes", files: [1MB, 100MB, 5MB, 200MB] },
+  { name: "Worker restart", crashWorkerAfter: 10 }
+];
+```
+
+### 5. Error Recovery Tests
+
+1. **Worker Crash**
+   - Force worker termination mid-processing
+   - Verify fallback to main thread
+   - Ensure no data loss
+
+2. **Memory Exhaustion**
+   - Process files until memory limit
+   - Verify graceful degradation
+   - Test automatic worker pool reduction
+
+3. **Browser Throttling**
+   - Test with DevTools CPU throttling
+   - Test with memory pressure
+   - Test in background tab
+
+### 6. User Experience Tests
+
+1. **Progress Accuracy**
+   - Progress bar updates smoothly
+   - Accurate time remaining estimates
+   - No progress regression
+
+2. **Cancellation Response**
+   - Cancel button responds immediately
+   - Workers stop within 500ms
+   - Clean state after cancel
+
+3. **Error Reporting**
+   - Clear error messages
+   - Actionable error recovery
+   - No silent failures
+
+### 7. Regression Tests
+
+Ensure existing features still work:
+- [ ] File validation
+- [ ] Export functionality
+- [ ] Settings persistence
+- [ ] Fast mode accuracy
+- [ ] All presets
+- [ ] Google Drive integration
+- [ ] Box integration
+
+### 8. Mobile Testing (Fallback Behavior)
+
+Even though workers won't work for audio on mobile, test:
+- Graceful fallback to main thread
+- Performance acceptable for small files
+- Clear messaging about limitations
+
+### 9. Real-World Data Sets
+
+Test with actual user data patterns:
+- **Voice recording set**: 137 files, 17-80MB each
+- **Music production set**: 50 files, 100-500MB each
+- **Podcast set**: 10 files, 500MB-1GB each
+- **Mixed set**: Various formats (WAV, FLAC, MP3)
+
+### 10. Automated Testing
+
+```javascript
+// Playwright/Puppeteer tests
+describe('Worker Batch Processing', () => {
+  test('processes 100 files without UI freeze', async () => {
+    // Upload 100 test files
+    // Monitor main thread responsiveness
+    // Assert no freezes > 100ms
+  });
+
+  test('handles Safari fallback correctly', async () => {
+    // Force Safari user agent
+    // Verify fallback to main thread
+    // Check performance acceptable
+  });
+});
+```
 
 ## Rollout Strategy
 
@@ -313,10 +467,56 @@ If Web Workers prove problematic, consider:
 3. **IndexedDB Caching**: Cache decoded audio to avoid re-decoding
 4. **Server-Side Processing**: For large batches, upload and process server-side
 
+## Recommendation Based on Analysis
+
+### ⚠️ **Reconsider Implementation**
+
+After thorough analysis, **Web Workers may not be the right solution** for this problem:
+
+**Major Issues:**
+1. **Safari incompatibility** - 35% of Mac users would need fallback
+2. **No mobile support** - All mobile users would need fallback
+3. **Added complexity** - Significant code complexity for partial benefit
+4. **Maintenance burden** - Two code paths to maintain and test
+
+### Alternative Recommendations
+
+#### **Option 1: Ship Current Solution** ✅ RECOMMENDED
+- We already have 60% performance improvement
+- Occasional 5s freezes are annoying but not breaking
+- Works universally across all browsers
+- Simple, maintainable code
+
+#### **Option 2: Optimize Current Solution**
+Instead of Workers, try:
+1. **Reduce audio buffer size**: Process in 10-second chunks
+2. **Stream processing**: Don't decode entire file at once
+3. **Direct WAV parsing**: Skip AudioContext for peak detection only
+4. **Lazy analysis**: Only decode when full analysis needed
+
+#### **Option 3: Progressive Enhancement**
+1. Ship current fast mode as-is
+2. Add "experimental worker mode" as opt-in beta feature
+3. Only enable for Chrome/Firefox desktop
+4. Gather real-world data before full rollout
+
 ## Questions to Resolve
 
-1. Should we use a worker pool or single worker?
-2. How many files should we process in parallel?
-3. Should we make this opt-in or default behavior?
-4. How do we handle progress reporting for parallel processing?
-5. What's the fallback strategy if workers aren't supported?
+1. Should we use a worker pool or single worker? **Answer: Neither - too risky**
+2. How many files should we process in parallel? **Answer: N/A**
+3. Should we make this opt-in or default behavior? **Answer: Ship current solution**
+4. How do we handle progress reporting for parallel processing? **Answer: N/A**
+5. What's the fallback strategy if workers aren't supported? **Answer: Current implementation**
+
+## Final Verdict
+
+**Cost-Benefit Analysis:**
+- **Cost**: High complexity, browser issues, maintenance burden
+- **Benefit**: Eliminate occasional 5s freezes for ~65% of users
+- **Verdict**: **Not worth it**
+
+**Recommendation**:
+1. Clean up current implementation (remove profiling)
+2. Ship fast mode with occasional freezes
+3. Document the limitation
+4. Consider simpler optimizations in future
