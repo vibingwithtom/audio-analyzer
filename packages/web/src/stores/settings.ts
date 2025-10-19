@@ -162,13 +162,12 @@ export function setIncludeRecommendations(enabled: boolean): void {
 
 // Peak Detection Mode Setting
 // Default: 'accurate' (prioritizes precision over speed)
-const peakDetectionModeValue = writable<'accurate' | 'fast'>('accurate');
+// Load saved value first, then initialize writable with it
+const initialPeakMode = typeof window !== 'undefined'
+  ? SettingsManager.getPeakDetectionMode()
+  : 'accurate';
 
-// Load from localStorage on initialization
-if (typeof window !== 'undefined') {
-  const saved = SettingsManager.getPeakDetectionMode();
-  peakDetectionModeValue.set(saved);
-}
+const peakDetectionModeValue = writable<'accurate' | 'fast'>(initialPeakMode);
 
 // Subscribe to changes and save to localStorage
 peakDetectionModeValue.subscribe((mode) => {
