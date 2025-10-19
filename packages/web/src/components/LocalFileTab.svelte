@@ -266,7 +266,8 @@
     try {
       const tempResults: AudioResults[] = [];
       const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
-      const CHUNK_SIZE = 5; // Process in chunks to prevent memory buildup
+      const CHUNK_SIZE = 3; // Process in chunks to prevent memory buildup (reduced from 5 due to persistent freezes)
+      const CHUNK_PAUSE_MS = 1000; // Pause duration between chunks
 
       // Performance profiling
       let lastFileTime = performance.now();
@@ -309,12 +310,15 @@
           // Performance logging
           const memInfo = memoryAvailable ? (performance as any).memory : null;
           const memoryMB = memInfo ? (memInfo.usedJSHeapSize / 1024 / 1024).toFixed(0) : 'N/A';
-          const freezeDetected = gapSinceLastFile > 1000; // Gap >1s indicates freeze/GC
+          // Freeze detection: >2s gap (not our deliberate 1s pauses) OR >2s processing time
+          const gapFreeze = gapSinceLastFile > 2000;
+          const processFreeze = fileProcessTime > 2000;
+          const freezeMarker = gapFreeze || processFreeze ? '🔴 FREEZE!' : '';
 
           console.log(
             `[Batch Profile] File ${i + 1}/${files.length} | ` +
-            `Process: ${fileProcessTime.toFixed(0)}ms | ` +
-            `Gap: ${gapSinceLastFile.toFixed(0)}ms ${freezeDetected ? '🔴 FREEZE!' : ''} | ` +
+            `Process: ${fileProcessTime.toFixed(0)}ms${processFreeze ? ' 🔴' : ''} | ` +
+            `Gap: ${gapSinceLastFile.toFixed(0)}ms${gapFreeze ? ' 🔴' : ''} | ` +
             `Memory: ${memoryMB}MB | ` +
             `${file.name}`
           );
@@ -324,10 +328,10 @@
           // CRITICAL: Process in chunks to prevent memory exhaustion and freezes
           // Each file creates ~338MB of temporary memory (arrayBuffer + AudioBuffer)
           // Processing too many files consecutively overwhelms GC, causing 5s+ freezes
-          // Solution: Mandatory 1-second pause every N files to force GC cleanup
+          // Solution: Mandatory pause every N files to force GC cleanup
           if ((i + 1) % CHUNK_SIZE === 0 && i < files.length - 1) {
-            console.log(`[Batch Profile] 🔄 Chunk ${Math.floor((i + 1) / CHUNK_SIZE)} complete - pausing for GC cleanup...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(`[Batch Profile] 🔄 Chunk ${Math.floor((i + 1) / CHUNK_SIZE)} complete - pausing ${CHUNK_PAUSE_MS}ms for GC cleanup...`);
+            await new Promise(resolve => setTimeout(resolve, CHUNK_PAUSE_MS));
           } else {
             // Normal inter-file delay
             await new Promise(resolve => setTimeout(resolve, 50));
