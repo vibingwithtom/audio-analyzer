@@ -320,6 +320,8 @@ async function analyzeExperimental(
   } finally {
     (levelAnalyzer as any).analysisInProgress = false;
     activeLevelAnalyzers.delete(levelAnalyzer);
+    // Close AudioContext to prevent resource leaks in batch processing
+    audioContext.close();
   }
 }
 
