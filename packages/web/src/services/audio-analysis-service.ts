@@ -205,8 +205,9 @@ async function analyzeFullFile(
 
   // Advanced/Experimental analysis
   if (mode === 'experimental') {
-    const arrayBuffer = await file.arrayBuffer();
+    let arrayBuffer: ArrayBuffer | null = await file.arrayBuffer();
     const advancedResults = await analyzeExperimental(arrayBuffer, progressCallback);
+    arrayBuffer = null; // Explicitly release 44MB ArrayBuffer for GC
     result = { ...result, ...advancedResults };
 
     // Track experimental feature usage

@@ -326,10 +326,10 @@
 
           lastFileTime = performance.now();
 
-          // Minimal delay to yield to event loop for UI updates
+          // Small delay to yield to event loop for UI updates and allow minor GC
           // Note: Occasional 5s GC pauses may occur during large batches (browser limitation)
           // Trade-off: Accept rare freezes vs destroying 60% performance gain with chunking
-          await new Promise(resolve => setTimeout(resolve, 0));
+          await new Promise(resolve => setTimeout(resolve, 10));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
