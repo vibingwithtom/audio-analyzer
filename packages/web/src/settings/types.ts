@@ -83,7 +83,7 @@ export interface LocalFilenameValidationSettings {
 /**
  * Peak detection mode for experimental analysis
  * - 'accurate': Full sample-by-sample scan (slower, 100% accurate)
- * - 'fast': Samples every 10th sample (90% faster, <0.1dB typical error)
+ * - 'fast': Samples every 5th sample (60% faster, ~0.3-0.5dB typical error)
  */
 export type PeakDetectionMode = 'accurate' | 'fast';
 
@@ -94,7 +94,7 @@ export interface AppSettings {
   criteria?: AudioCriteria;
   includeFailureAnalysis?: boolean; // Include failure analysis in enhanced exports (default: true)
   includeRecommendations?: boolean; // Include recommendations in enhanced exports (default: true)
-  peakDetectionMode?: PeakDetectionMode; // Peak detection: 'accurate' (every sample) or 'fast' (every 10th sample, 90% faster)
+  peakDetectionMode?: PeakDetectionMode; // Peak detection: 'accurate' (every sample) or 'fast' (every 5th sample, 60% faster)
 }
 
 /**

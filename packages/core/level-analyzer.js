@@ -1883,7 +1883,7 @@ export class LevelAnalyzer {
    * @param {AudioBuffer} audioBuffer The audio buffer to analyze.
    * @param {number} sampleRate Sample rate of the audio.
    * @param {function} progressCallback Optional progress callback.
-   * @param {string} mode Peak detection mode: 'accurate' (default, 100% accurate) or 'fast' (90%+ faster, ~0.1-0.5dB tolerance)
+   * @param {string} mode Peak detection mode: 'accurate' (default, 100% accurate) or 'fast' (60% faster, ~0.3-0.5dB tolerance)
    * @returns {object} Combined results with peak and clipping analysis.
    */
   async analyzePeakAndClipping(audioBuffer, sampleRate, progressCallback = null, mode = 'accurate') {
@@ -1895,11 +1895,11 @@ export class LevelAnalyzer {
       throw new AnalysisCancelledError('Analysis cancelled', 'peak-clipping-combined');
     }
 
-    // OPTIMIZATION: Fast peak scan using medium-density sampling (every 10th sample)
-    // More reliable than sparse sampling (every 100th), still 90% faster than full scan
+    // OPTIMIZATION: Fast peak scan using medium-density sampling (every 5th sample)
+    // More reliable than sparse sampling, still 60% faster than full scan
     console.time('[Profile] Peak - Fast Scan');
     let quickPeak = 0;
-    const decimation = mode === 'fast' ? 10 : 100; // Fast mode: every 10th sample, accurate mode: every 100th
+    const decimation = mode === 'fast' ? 5 : 100; // Fast mode: every 5th sample, accurate mode: every 100th
 
     for (let channel = 0; channel < channels; channel++) {
       const data = audioBuffer.getChannelData(channel);
