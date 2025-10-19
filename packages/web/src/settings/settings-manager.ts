@@ -218,6 +218,42 @@ export class SettingsManager {
   }
 
   /**
+   * Gets the peak detection mode preference from localStorage
+   * Returns 'accurate' as default if no preference is saved
+   */
+  static getPeakDetectionMode(): 'accurate' | 'fast' {
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (!stored) return 'accurate'; // Default to accurate mode
+
+    try {
+      const settings: AppSettings = JSON.parse(stored);
+      return settings.peakDetectionMode || 'accurate';
+    } catch (error) {
+      console.warn('Failed to load peak detection mode from localStorage:', error);
+      return 'accurate';
+    }
+  }
+
+  /**
+   * Saves peak detection mode preference to localStorage
+   */
+  static savePeakDetectionMode(mode: 'accurate' | 'fast'): void {
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    let settings: AppSettings = {};
+
+    if (stored) {
+      try {
+        settings = JSON.parse(stored);
+      } catch (error) {
+        console.warn('Failed to parse existing settings, creating new:', error);
+      }
+    }
+
+    settings.peakDetectionMode = mode;
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  }
+
+  /**
    * Clears all settings from localStorage (useful for testing or reset)
    */
   static clearAllSettings(): void {

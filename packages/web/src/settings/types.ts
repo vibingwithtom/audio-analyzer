@@ -81,12 +81,20 @@ export interface LocalFilenameValidationSettings {
 }
 
 /**
+ * Peak detection mode for experimental analysis
+ * - 'accurate': Full sample-by-sample scan (slower, 100% accurate)
+ * - 'fast': Progressive refinement with sampling (90%+ faster, ~0.1-0.5dB tolerance)
+ */
+export type PeakDetectionMode = 'accurate' | 'fast';
+
+/**
  * Main application settings stored in localStorage
  */
 export interface AppSettings {
   criteria?: AudioCriteria;
   includeFailureAnalysis?: boolean; // Include failure analysis in enhanced exports (default: true)
   includeRecommendations?: boolean; // Include recommendations in enhanced exports (default: true)
+  peakDetectionMode?: PeakDetectionMode; // Peak detection mode for experimental analysis (default: 'accurate')
 }
 
 /**

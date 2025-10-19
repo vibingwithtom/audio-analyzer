@@ -160,6 +160,33 @@ export function setIncludeRecommendations(enabled: boolean): void {
   includeRecommendationsValue.set(enabled);
 }
 
+// Peak Detection Mode Setting
+// Default: 'accurate' (prioritizes precision over speed)
+const peakDetectionModeValue = writable<'accurate' | 'fast'>('accurate');
+
+// Load from localStorage on initialization
+if (typeof window !== 'undefined') {
+  const saved = SettingsManager.getPeakDetectionMode();
+  peakDetectionModeValue.set(saved);
+}
+
+// Subscribe to changes and save to localStorage
+peakDetectionModeValue.subscribe((mode) => {
+  if (typeof window !== 'undefined') {
+    SettingsManager.savePeakDetectionMode(mode);
+  }
+});
+
+// Export as readable store
+export const peakDetectionMode: Readable<'accurate' | 'fast'> = {
+  subscribe: peakDetectionModeValue.subscribe
+};
+
+// Export function to update the setting
+export function setPeakDetectionMode(mode: 'accurate' | 'fast'): void {
+  peakDetectionModeValue.set(mode);
+}
+
 // Check if current configuration is valid (has a properly configured preset)
 export const hasValidPresetConfig: Readable<boolean> = derived(
   [selectedPresetId, criteria],

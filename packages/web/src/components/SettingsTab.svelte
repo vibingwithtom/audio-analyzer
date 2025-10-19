@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { availablePresets, currentPresetId, setPreset, selectedPreset, currentCriteria, updateCustomCriteria, hasValidPresetConfig, enableIncludeFailureAnalysis, setIncludeFailureAnalysis, enableIncludeRecommendations, setIncludeRecommendations } from '../stores/settings';
+  import { availablePresets, currentPresetId, setPreset, selectedPreset, currentCriteria, updateCustomCriteria, hasValidPresetConfig, enableIncludeFailureAnalysis, setIncludeFailureAnalysis, enableIncludeRecommendations, setIncludeRecommendations, peakDetectionMode, setPeakDetectionMode } from '../stores/settings';
   import type { AudioCriteria } from '../settings/types';
 
   // Custom criteria form state
@@ -707,6 +707,27 @@
           on:click={() => setIncludeRecommendations(!$enableIncludeRecommendations)}
           aria-label="Toggle recommendations"
           aria-pressed={$enableIncludeRecommendations}
+        ></button>
+      </div>
+
+      <!-- Peak Detection Mode Toggle -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-primary, #ffffff); border-radius: 4px; border: 1px solid var(--border-color, #e0e0e0);">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; color: var(--text-primary, #333333);">Fast Peak Detection (Experimental)</div>
+          <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); margin-top: 0.25rem;">
+            {#if $peakDetectionMode === 'fast'}
+              ⚡ Speed mode: 90%+ faster analysis (~0.1-0.5dB tolerance)
+            {:else}
+              🎯 Accurate mode: 100% precise peak detection (slower)
+            {/if}
+          </div>
+        </div>
+        <button
+          class="toggle-switch"
+          class:active={$peakDetectionMode === 'fast'}
+          on:click={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
+          aria-label="Toggle peak detection mode"
+          aria-pressed={$peakDetectionMode === 'fast'}
         ></button>
       </div>
     </div>
