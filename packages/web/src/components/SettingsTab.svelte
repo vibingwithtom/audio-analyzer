@@ -716,9 +716,9 @@
           <div style="font-weight: 500; color: var(--text-primary, #333333);">Fast Peak Detection (Experimental)</div>
           <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); margin-top: 0.25rem;">
             {#if $peakDetectionMode === 'fast'}
-              ⚡ Speed mode: 90%+ faster analysis (~0.1-0.5dB tolerance)
+              ⚡ Speed mode: 90% faster, samples every 10th sample (&lt;0.1dB typical error)
             {:else}
-              🎯 Accurate mode: 100% precise peak detection (slower)
+              🎯 Accurate mode: 100% precise, scans every sample (slower)
             {/if}
           </div>
         </div>

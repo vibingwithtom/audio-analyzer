@@ -1895,14 +1895,15 @@ export class LevelAnalyzer {
       throw new AnalysisCancelledError('Analysis cancelled', 'peak-clipping-combined');
     }
 
-    // OPTIMIZATION: Quick peak scan first to determine if clipping analysis is needed
-    console.time('[Profile] Peak - Quick Scan');
+    // OPTIMIZATION: Fast peak scan using medium-density sampling (every 10th sample)
+    // More reliable than sparse sampling (every 100th), still 90% faster than full scan
+    console.time('[Profile] Peak - Fast Scan');
     let quickPeak = 0;
-    const quickDecimation = 100;
+    const decimation = mode === 'fast' ? 10 : 100; // Fast mode: every 10th sample, accurate mode: every 100th
 
     for (let channel = 0; channel < channels; channel++) {
       const data = audioBuffer.getChannelData(channel);
-      for (let i = 0; i < length; i += quickDecimation) {
+      for (let i = 0; i < length; i += decimation) {
         const sample = Math.abs(data[i]);
         if (sample > quickPeak) {
           quickPeak = sample;
@@ -1918,7 +1919,7 @@ export class LevelAnalyzer {
       }
       if (quickPeak >= 0.99999) break;
     }
-    console.timeEnd('[Profile] Peak - Quick Scan');
+    console.timeEnd('[Profile] Peak - Fast Scan');
 
     // FAST MODE: Use quick scan result directly (90%+ faster, ~0.1-0.5dB tolerance)
     if (mode === 'fast' && quickPeak < 0.9) {
