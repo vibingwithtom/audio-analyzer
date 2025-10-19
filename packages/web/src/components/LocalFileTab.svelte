@@ -293,10 +293,11 @@
           if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
             batchResults = [...batchResults, ...tempResults];
             tempResults.length = 0; // Clear temp array
-
-            // Yield to event loop after UI update to allow rendering and GC
-            await new Promise(resolve => setTimeout(resolve, 50));
           }
+
+          // Yield after EVERY file to give GC frequent opportunities to clean up AudioBuffers
+          // Decoded AudioBuffers are huge (~250MB each) and need aggressive minor GC
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
