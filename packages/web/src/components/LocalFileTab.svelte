@@ -266,8 +266,6 @@
     try {
       const tempResults: AudioResults[] = [];
       const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
-      const CHUNK_SIZE = 3; // Process in chunks to prevent memory buildup (reduced from 5 due to persistent freezes)
-      const CHUNK_PAUSE_MS = 1000; // Pause duration between chunks
 
       // Performance profiling
       let lastFileTime = performance.now();
@@ -325,17 +323,10 @@
 
           lastFileTime = performance.now();
 
-          // CRITICAL: Process in chunks to prevent memory exhaustion and freezes
-          // Each file creates ~338MB of temporary memory (arrayBuffer + AudioBuffer)
-          // Processing too many files consecutively overwhelms GC, causing 5s+ freezes
-          // Solution: Mandatory pause every N files to force GC cleanup
-          if ((i + 1) % CHUNK_SIZE === 0 && i < files.length - 1) {
-            console.log(`[Batch Profile] 🔄 Chunk ${Math.floor((i + 1) / CHUNK_SIZE)} complete - pausing ${CHUNK_PAUSE_MS}ms for GC cleanup...`);
-            await new Promise(resolve => setTimeout(resolve, CHUNK_PAUSE_MS));
-          } else {
-            // Normal inter-file delay
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
+          // Minimal delay to yield to event loop for UI updates
+          // Note: Occasional 5s GC pauses may occur during large batches (browser limitation)
+          // Trade-off: Accept rare freezes vs destroying 60% performance gain with chunking
+          await new Promise(resolve => setTimeout(resolve, 0));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {

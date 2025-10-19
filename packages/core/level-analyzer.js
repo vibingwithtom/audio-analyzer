@@ -1924,7 +1924,7 @@ export class LevelAnalyzer {
     // FAST MODE: Use quick scan result directly (90%+ faster, ~0.1-0.5dB tolerance)
     if (mode === 'fast' && quickPeak < 0.9) {
       const peakDb = quickPeak > 0 ? 20 * Math.log10(quickPeak) : -Infinity;
-      // console.log(`[Performance] Fast mode: Using quick peak ${peakDb.toFixed(2)}dB (skipped full scan)`);
+      console.log(`[Performance] Fast mode: Using quick peak ${peakDb.toFixed(2)}dB (skipped full scan)`);
 
       return {
         globalPeak: quickPeak,
