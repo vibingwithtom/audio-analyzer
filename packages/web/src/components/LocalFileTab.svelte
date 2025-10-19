@@ -264,6 +264,9 @@
     });
 
     try {
+      const tempResults: AudioResults[] = [];
+      const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
+
       for (let i = 0; i < files.length; i++) {
         // Check if cancel was requested
         if (cancelRequested) {
@@ -283,11 +286,17 @@
           // Store File reference for lazy blob URL creation (prevents memory buildup)
           (result as any).file = file;
 
-          batchResults = [...batchResults, result];
+          // Accumulate results
+          tempResults.push(result);
 
-          // Yield to event loop to prevent UI freezing during batch processing
-          // Allows browser to process UI updates, handle user interactions, and run GC
-          await new Promise(resolve => setTimeout(resolve, 0));
+          // Batch UI updates - only update table every N files to prevent constant re-rendering
+          if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
+            batchResults = [...batchResults, ...tempResults];
+            tempResults.length = 0; // Clear temp array
+
+            // Yield to event loop after UI update to allow rendering and GC
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
@@ -295,8 +304,8 @@
             break;
           }
 
-          // Add error result for real errors (not cancellations)
-          batchResults = [...batchResults, {
+          // Add error result to temp array (will be flushed with batch)
+          tempResults.push({
             filename: file.name,
             fileSize: file.size,
             fileType: 'unknown',
@@ -312,8 +321,13 @@
                 issue: err instanceof Error ? err.message : 'Unknown error'
               }
             }
-          }];
+          });
         }
+      }
+
+      // Flush any remaining results
+      if (tempResults.length > 0) {
+        batchResults = [...batchResults, ...tempResults];
       }
     } finally {
       // Track batch completion
