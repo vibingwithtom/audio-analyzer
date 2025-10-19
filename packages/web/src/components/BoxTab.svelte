@@ -281,8 +281,6 @@
 
         const filesToProcess = await boxAPI.listAudioFilesInFolder(parsed.id, parsed.sharedLink);
 
-        console.log('[BoxTab] Box API returned files:', filesToProcess.length, filesToProcess.map(f => f.name));
-
         if (filesToProcess.length === 0) {
           error = 'No audio files found in the folder';
           processing = false;
@@ -291,7 +289,6 @@
 
         // Multiple files: use batch processing
         processing = false;
-        console.log('[BoxTab] Starting batch processing with', filesToProcess.length, 'files');
         await processBatchFiles(filesToProcess);
       } else {
         // File URL - single file processing
@@ -407,18 +404,14 @@
               if (currentDisplayedFile === boxFile.name) {
                 currentDisplayedFile = null;
               }
-
-              console.log(`[BoxTab] Completed file ${processedFiles}/${boxFiles.length}: ${boxFile.name}, total results: ${batchResults.length}`);
             } catch (err) {
               if (err instanceof AnalysisCancelledError) {
                 batchCancelled = true;
-                console.log(`[BoxTab] File cancelled: ${boxFile.name}`);
                 // No need to add to results, just stop this worker
                 return;
               }
               // Log error for debugging
               console.error(`Error processing ${boxFile.name}:`, err);
-              console.log(`[BoxTab] File failed: ${boxFile.name}, error: ${err instanceof Error ? err.message : 'Unknown error'}`);
 
               // Add error result
               const errorResult: AudioResults = {
@@ -434,11 +427,9 @@
               };
               batchResults = [...batchResults, errorResult];
               processedFiles = batchResults.length;
-              console.log(`[BoxTab] Error result added, total results: ${batchResults.length}`);
             } finally {
               // Remove this task from inProgress when complete
               inProgress.delete(taskId);
-              console.log(`[BoxTab] Task ${taskId} removed from queue, remaining: ${inProgress.size}`);
             }
           })();
 
