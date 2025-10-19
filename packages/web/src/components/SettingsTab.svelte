@@ -740,5 +740,12 @@
         aria-pressed={$peakDetectionMode === 'fast'}
       ></button>
     </div>
+
+    <!-- Performance Note -->
+    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px; border-left: 3px solid var(--info, #3b82f6);">
+      <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); line-height: 1.5;">
+        <strong style="color: var(--text-primary, #333333);">Note:</strong> During batch processing of large files (40MB+), you may experience brief UI pauses (~5 seconds) approximately every 10-15 files due to browser memory management. This is a browser limitation and does not affect analysis accuracy. Processing continues automatically after each pause.
+      </div>
+    </div>
   </div>
 </div>

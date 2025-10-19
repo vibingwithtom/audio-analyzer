@@ -127,16 +127,13 @@ export class LevelAnalyzer {
 
       if (includeExperimental) {
         // Combined pass for peak + clipping
-        // console.time('[Profile] Peak & Clipping');
         if (progressCallback) progressCallback('Analyzing peak levels and clipping...', LevelAnalyzer.PROGRESS_STAGES.PEAK_START);
         const combined = await this.analyzePeakAndClipping(audioBuffer, sampleRate, progressCallback, peakDetectionMode);
-        // console.timeEnd('[Profile] Peak & Clipping');
         globalPeak = combined.globalPeak;
         peakDb = combined.peakDb;
         clippingAnalysis = combined.clippingAnalysis;
       } else {
         // Base analysis only: simple peak detection
-        console.time('[Profile] Peak Detection');
         if (progressCallback) progressCallback('Analyzing peak levels...', LevelAnalyzer.PROGRESS_STAGES.PEAK_START);
 
         for (let channel = 0; channel < channels; channel++) {
@@ -167,19 +164,14 @@ export class LevelAnalyzer {
         }
 
         peakDb = globalPeak > 0 ? 20 * Math.log10(globalPeak) : -Infinity;
-        // console.timeEnd('[Profile] Peak Detection');
       }
 
       // 2. OPTIMIZATION (Phase 2): Calculate RMS windows once for reuse
-      // console.time('[Profile] Noise Floor (RMS Windows)');
       if (progressCallback) progressCallback('Analyzing noise floor...', LevelAnalyzer.PROGRESS_STAGES.NOISE_FLOOR_START);
       const rmsWindows = await this.calculateRMSWindows(channelData, channels, length, sampleRate, progressCallback);
-      // console.timeEnd('[Profile] Noise Floor (RMS Windows)');
 
       // 3. Noise Floor Analysis (uses pre-calculated RMS windows)
-      // console.time('[Profile] Noise Floor Analysis');
       const noiseFloorAnalysis = await this.analyzeNoiseFloorFromWindows(rmsWindows, progressCallback);
-      // console.timeEnd('[Profile] Noise Floor Analysis');
 
       // 4. Normalization Check
       if (progressCallback) progressCallback('Checking normalization...', LevelAnalyzer.PROGRESS_STAGES.NORMALIZATION_START);
@@ -198,17 +190,13 @@ export class LevelAnalyzer {
       // Experimental analysis (only when requested)
       if (includeExperimental) {
         // Reverb Estimation
-        // console.time('[Profile] Reverb Analysis');
         if (progressCallback) progressCallback('Estimating reverb...', LevelAnalyzer.PROGRESS_STAGES.REVERB_START);
         const reverbAnalysisResults = await this.estimateReverb(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, progressCallback);
-        // console.timeEnd('[Profile] Reverb Analysis');
         const reverbInfo = this.interpretReverb(reverbAnalysisResults.overallMedianRt60);
 
         // Silence Analysis (use original method for accurate timing at all sample rates)
-        // console.time('[Profile] Silence Analysis');
         if (progressCallback) progressCallback('Analyzing silence...', LevelAnalyzer.PROGRESS_STAGES.SILENCE_START);
         const { leadingSilence, trailingSilence, longestSilence, silenceSegments } = this.analyzeSilence(channelData, channels, length, sampleRate, noiseFloorAnalysis.overall, peakDb, progressCallback);
-        // console.timeEnd('[Profile] Silence Analysis');
 
         // Clipping Analysis - already done in combined pass above (OPTIMIZATION)
         // No separate call needed here
@@ -1897,7 +1885,6 @@ export class LevelAnalyzer {
 
     // OPTIMIZATION: Fast peak scan using medium-density sampling (every 5th sample)
     // More reliable than sparse sampling, still 60% faster than full scan
-    // console.time('[Profile] Peak - Fast Scan');
     let quickPeak = 0;
     const decimation = mode === 'fast' ? 5 : 100; // Fast mode: every 5th sample, accurate mode: every 100th
 
@@ -1919,12 +1906,10 @@ export class LevelAnalyzer {
       }
       if (quickPeak >= 0.99999) break;
     }
-    // console.timeEnd('[Profile] Peak - Fast Scan');
 
     // FAST MODE: Use quick scan result directly (90%+ faster, ~0.1-0.5dB tolerance)
     if (mode === 'fast' && quickPeak < 0.9) {
       const peakDb = quickPeak > 0 ? 20 * Math.log10(quickPeak) : -Infinity;
-      console.log(`[Performance] Fast mode: Using quick peak ${peakDb.toFixed(2)}dB (skipped full scan)`);
 
       return {
         globalPeak: quickPeak,
@@ -1936,7 +1921,6 @@ export class LevelAnalyzer {
     // If quick scan shows peak < 0.9 (~-1dB), clipping is impossible
     // Skip expensive clipping analysis and just do accurate peak detection
     if (quickPeak < 0.9) {
-      console.time('[Profile] Peak - Full Scan (No Clipping)');
       let globalPeak = 0;
 
       for (let channel = 0; channel < channels; channel++) {
@@ -1963,7 +1947,6 @@ export class LevelAnalyzer {
       }
 
       const peakDb = globalPeak > 0 ? 20 * Math.log10(globalPeak) : -Infinity;
-      console.timeEnd('[Profile] Peak - Full Scan (No Clipping)');
 
       // Return with null clipping analysis (no clipping possible at this level)
       return {
@@ -1975,7 +1958,6 @@ export class LevelAnalyzer {
 
     // Quick scan shows peak >= 0.9, clipping is possible
     // Do full combined peak + clipping analysis
-    console.time('[Profile] Peak & Clipping - Full Combined Scan');
 
     // Peak detection variables
     let globalPeak = 0;
@@ -2210,8 +2192,6 @@ export class LevelAnalyzer {
       if (a.type === 'near' && b.type === 'hard') return 1;
       return b.duration - a.duration;
     });
-
-    console.timeEnd('[Profile] Peak & Clipping - Full Combined Scan');
 
     return {
       // Peak analysis results
