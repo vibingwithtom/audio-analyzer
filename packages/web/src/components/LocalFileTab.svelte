@@ -285,6 +285,10 @@
           result.audioUrl = blobUrl;
 
           batchResults = [...batchResults, result];
+
+          // Yield to event loop to prevent UI freezing during batch processing
+          // Allows browser to process UI updates, handle user interactions, and run GC
+          await new Promise(resolve => setTimeout(resolve, 0));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
