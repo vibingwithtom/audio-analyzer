@@ -68,7 +68,8 @@ describe('audio-analysis-service', () => {
         bitDepth: 24,
         channels: 2,
         duration: 120
-      })
+      }),
+      cleanup: vi.fn()
     };
 
     AudioAnalyzer.mockImplementation(() => mockAudioAnalyzer);
