@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+# 🚨 STOP! READ THIS FIRST 🚨
+**Before writing ANY code, ALWAYS:**
+1. ✅ Check current branch: `git branch --show-current`
+2. ✅ If on `main`, STOP and create feature branch: `git checkout -b feature/descriptive-name`
+3. ✅ Only then proceed with coding
+
+**NO EXCEPTIONS. This prevents production breakage.**
+---
+
 ## ⚠️ CRITICAL: Development Workflow Rules
 
 **THESE RULES MUST BE FOLLOWED TO PREVENT PRODUCTION ISSUES:**
