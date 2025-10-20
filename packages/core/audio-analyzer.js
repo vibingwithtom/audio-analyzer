@@ -172,10 +172,34 @@ export class AudioAnalyzer {
         const chunkSize = view.getUint32(offset + 4, true);
 
         if (chunkId === 'fmt ') {
-          const audioFormat = view.getUint16(offset + 8, true);
+          let audioFormat = view.getUint16(offset + 8, true);
           const channels = view.getUint16(offset + 10, true);
           const sampleRate = view.getUint32(offset + 12, true);
           const bitsPerSample = view.getUint16(offset + 22, true);
+
+          // Handle WAVE_FORMAT_EXTENSIBLE (format 65534 / 0xFFFE)
+          // For extensible format, read the SubFormat GUID to get the actual format
+          if (audioFormat === 65534) {
+            // ExtensibleFormat has:
+            // offset + 24: extsize (2 bytes)
+            // offset + 26: validbits (2 bytes)
+            // offset + 28: channelmask (4 bytes)
+            // offset + 32: SubFormat GUID (16 bytes)
+
+            // Read the first 4 bytes of SubFormat GUID (little-endian format code)
+            if (offset + 36 <= view.byteLength) {
+              const subFormatCode = view.getUint32(offset + 32, true);
+              // 0x00000001 = PCM (uncompressed)
+              if (subFormatCode === 1) {
+                audioFormat = 1; // Treat as standard PCM format
+              }
+              // Other common SubFormat codes:
+              // 0x00000002 = ADPCM
+              // 0x00000006 = ALAW
+              // 0x00000007 = MULAW
+              // 0xFFFE = deprecated, shouldn't appear here
+            }
+          }
 
           // Calculate duration from data chunk
           const duration = this.calculateWavDuration(view, sampleRate, channels, bitsPerSample);
