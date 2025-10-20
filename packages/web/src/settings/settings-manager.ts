@@ -43,8 +43,25 @@ export class SettingsManager {
    * Saves criteria settings to localStorage
    */
   static saveCriteria(criteria: AudioCriteria): void {
-    const settings: AppSettings = { criteria };
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    let settings: AppSettings = {};
+
+    if (stored) {
+      try {
+        settings = JSON.parse(stored);
+      } catch (error) {
+        console.warn('Failed to parse existing settings, creating new:', error);
+      }
+    }
+
+    settings.criteria = criteria;
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.warn('Failed to save criteria to localStorage:', error);
+      // Settings will work in-memory only until page reload
+    }
   }
 
   /**
@@ -58,7 +75,11 @@ export class SettingsManager {
    * Saves the selected preset ID to localStorage
    */
   static saveSelectedPreset(presetId: string): void {
-    localStorage.setItem(STORAGE_KEYS.SELECTED_PRESET, presetId);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_PRESET, presetId);
+    } catch (error) {
+      console.warn('Failed to save selected preset to localStorage:', error);
+    }
   }
 
   /**
@@ -110,7 +131,11 @@ export class SettingsManager {
    * Saves Google Drive filename validation settings to localStorage
    */
   static saveFilenameValidationSettings(settings: FilenameValidationSettings): void {
-    localStorage.setItem(STORAGE_KEYS.FILENAME_VALIDATION, JSON.stringify(settings));
+    try {
+      localStorage.setItem(STORAGE_KEYS.FILENAME_VALIDATION, JSON.stringify(settings));
+    } catch (error) {
+      console.warn('Failed to save filename validation settings to localStorage:', error);
+    }
   }
 
   /**
@@ -143,7 +168,11 @@ export class SettingsManager {
    * Saves Box filename validation settings to localStorage
    */
   static saveBoxFilenameValidationSettings(settings: BoxFilenameValidationSettings): void {
-    localStorage.setItem(STORAGE_KEYS.BOX_FILENAME_VALIDATION, JSON.stringify(settings));
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOX_FILENAME_VALIDATION, JSON.stringify(settings));
+    } catch (error) {
+      console.warn('Failed to save Box filename validation settings to localStorage:', error);
+    }
   }
 
   /**
@@ -176,7 +205,11 @@ export class SettingsManager {
    * Saves Local filename validation settings to localStorage
    */
   static saveLocalFilenameValidationSettings(settings: LocalFilenameValidationSettings): void {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_FILENAME_VALIDATION, JSON.stringify(settings));
+    try {
+      localStorage.setItem(STORAGE_KEYS.LOCAL_FILENAME_VALIDATION, JSON.stringify(settings));
+    } catch (error) {
+      console.warn('Failed to save local filename validation settings to localStorage:', error);
+    }
   }
 
   /**
@@ -193,7 +226,11 @@ export class SettingsManager {
    * Saves dark mode preference to localStorage
    */
   static saveDarkModePreference(enabled: boolean): void {
-    localStorage.setItem(STORAGE_KEYS.DARK_MODE, enabled ? 'true' : 'false');
+    try {
+      localStorage.setItem(STORAGE_KEYS.DARK_MODE, enabled ? 'true' : 'false');
+    } catch (error) {
+      console.warn('Failed to save dark mode preference to localStorage:', error);
+    }
   }
 
   /**
@@ -207,14 +244,64 @@ export class SettingsManager {
    * Clears the Box authentication flag
    */
   static clearBoxAuthenticationFlag(): void {
-    localStorage.removeItem(STORAGE_KEYS.BOX_JUST_AUTHENTICATED);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.BOX_JUST_AUTHENTICATED);
+    } catch (error) {
+      console.warn('Failed to clear Box authentication flag from localStorage:', error);
+    }
   }
 
   /**
    * Sets the Box authentication flag (typically done during OAuth callback)
    */
   static setBoxAuthenticationFlag(): void {
-    localStorage.setItem(STORAGE_KEYS.BOX_JUST_AUTHENTICATED, 'true');
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOX_JUST_AUTHENTICATED, 'true');
+    } catch (error) {
+      console.warn('Failed to set Box authentication flag in localStorage:', error);
+    }
+  }
+
+  /**
+   * Gets the peak detection mode preference from localStorage
+   * Returns 'accurate' as default if no preference is saved
+   */
+  static getPeakDetectionMode(): 'accurate' | 'fast' {
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (!stored) return 'accurate'; // Default to accurate mode
+
+    try {
+      const settings: AppSettings = JSON.parse(stored);
+      return settings.peakDetectionMode || 'accurate';
+    } catch (error) {
+      console.warn('Failed to load peak detection mode from localStorage:', error);
+      return 'accurate';
+    }
+  }
+
+  /**
+   * Saves peak detection mode preference to localStorage
+   */
+  static savePeakDetectionMode(mode: 'accurate' | 'fast'): void {
+    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    let settings: AppSettings = {};
+
+    if (stored) {
+      try {
+        settings = JSON.parse(stored);
+      } catch (error) {
+        console.warn('Failed to parse existing settings, creating new:', error);
+      }
+    }
+
+    settings.peakDetectionMode = mode;
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.warn('Failed to save peak detection mode to localStorage:', error);
+      // Settings will work in-memory only until page reload
+    }
   }
 
   /**
@@ -251,8 +338,12 @@ export class SettingsManager {
     Object.entries(settings).forEach(([name, value]) => {
       const key = STORAGE_KEYS[name as keyof typeof STORAGE_KEYS];
       if (key) {
-        const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-        localStorage.setItem(key, stringValue);
+        try {
+          const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+          localStorage.setItem(key, stringValue);
+        } catch (error) {
+          console.warn(`Failed to import setting '${name}' to localStorage:`, error);
+        }
       }
     });
   }

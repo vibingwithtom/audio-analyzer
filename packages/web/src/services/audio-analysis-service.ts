@@ -4,6 +4,7 @@ import type { AudioResults, ValidationResults } from '../types';
 import type { AnalysisMode } from '../stores/analysisMode';
 import type { PresetConfig } from '../settings/types';
 import { analyticsService } from './analytics-service';
+import { SettingsManager } from '../settings/settings-manager';
 
 // Track all active LevelAnalyzer instances for concurrent batch processing
 const activeLevelAnalyzers = new Set<LevelAnalyzer>();
@@ -206,8 +207,9 @@ async function analyzeFullFile(
 
     // Advanced/Experimental analysis
     if (mode === 'experimental') {
-      const arrayBuffer = await file.arrayBuffer();
+      let arrayBuffer: ArrayBuffer | null = await file.arrayBuffer();
       const advancedResults = await analyzeExperimental(arrayBuffer, progressCallback);
+      arrayBuffer = null; // Explicitly release 44MB ArrayBuffer for GC
       result = { ...result, ...advancedResults };
 
       // Track experimental feature usage
@@ -289,8 +291,11 @@ async function analyzeExperimental(
   activeLevelAnalyzers.add(levelAnalyzer);
 
   try {
+    // Get peak detection mode from settings (defaults to 'accurate')
+    const peakDetectionMode = SettingsManager.getPeakDetectionMode();
+
     // Run level analysis with experimental features (reverb, noise floor, silence)
-    const advancedResults = await (levelAnalyzer as any).analyzeAudioBuffer(audioBuffer, progressCallback ?? null, true);
+    const advancedResults = await (levelAnalyzer as any).analyzeAudioBuffer(audioBuffer, progressCallback ?? null, true, peakDetectionMode);
 
     // Re-enable analysisInProgress for additional analyses
     (levelAnalyzer as any).analysisInProgress = true;

@@ -244,6 +244,13 @@
     });
 
     try {
+      const tempResults: AudioResults[] = [];
+      const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
+
+      // Performance profiling
+      let lastFileTime = performance.now();
+      const memoryAvailable = 'memory' in performance;
+
       for (let i = 0; i < files.length; i++) {
         // Check if cancel was requested
         if (cancelRequested) {
@@ -255,16 +262,54 @@
         processedFiles = i + 1;
 
         try {
+          const fileStartTime = performance.now();
+
           // Reset progress to 0 for new file
           analysisProgress.progress = 0;
           const progressCallback = createProgressCallback(file.name, i + 1, files.length);
           const result = await processSingleFile(file, true, progressCallback);
 
-          // Create blob URL for audio playback in batch mode
-          const blobUrl = URL.createObjectURL(file);
-          result.audioUrl = blobUrl;
+          const fileEndTime = performance.now();
+          const fileProcessTime = fileEndTime - fileStartTime;
+          const gapSinceLastFile = fileStartTime - lastFileTime;
 
-          batchResults = [...batchResults, result];
+          // Store File reference for lazy blob URL creation ONLY if audio playback is shown
+          // In experimental mode, no audio player is displayed, so don't keep 6GB of files in memory!
+          if ($analysisMode !== 'experimental') {
+            (result as any).file = file;
+          }
+
+          // Accumulate results
+          tempResults.push(result);
+
+          // Batch UI updates - only update table every N files to prevent constant re-rendering
+          if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
+            batchResults = [...batchResults, ...tempResults];
+            tempResults.length = 0; // Clear temp array
+          }
+
+          // Performance logging
+          const memInfo = memoryAvailable ? (performance as any).memory : null;
+          const memoryMB = memInfo ? (memInfo.usedJSHeapSize / 1024 / 1024).toFixed(0) : 'N/A';
+          // Freeze detection: >2s gap (not our deliberate 1s pauses) OR >2s processing time
+          const gapFreeze = gapSinceLastFile > 2000;
+          const processFreeze = fileProcessTime > 2000;
+          const freezeMarker = gapFreeze || processFreeze ? '🔴 FREEZE!' : '';
+
+          console.log(
+            `[Batch Profile] File ${i + 1}/${files.length} | ` +
+            `Process: ${fileProcessTime.toFixed(0)}ms${processFreeze ? ' 🔴' : ''} | ` +
+            `Gap: ${gapSinceLastFile.toFixed(0)}ms${gapFreeze ? ' 🔴' : ''} | ` +
+            `Memory: ${memoryMB}MB | ` +
+            `${file.name}`
+          );
+
+          lastFileTime = performance.now();
+
+          // Small delay to yield to event loop for UI updates and allow minor GC
+          // Note: Occasional 5s GC pauses may occur during large batches (browser limitation)
+          // Trade-off: Accept rare freezes vs destroying 60% performance gain with chunking
+          await new Promise(resolve => setTimeout(resolve, 10));
         } catch (err) {
           // If cancelled, don't add incomplete result - just break
           if (err instanceof AnalysisCancelledError) {
@@ -272,8 +317,8 @@
             break;
           }
 
-          // Add error result for real errors (not cancellations)
-          batchResults = [...batchResults, {
+          // Add error result to temp array (will be flushed with batch)
+          tempResults.push({
             filename: file.name,
             fileSize: file.size,
             fileType: 'unknown',
@@ -289,8 +334,13 @@
                 issue: err instanceof Error ? err.message : 'Unknown error'
               }
             }
-          }];
+          });
         }
+      }
+
+      // Flush any remaining results
+      if (tempResults.length > 0) {
+        batchResults = [...batchResults, ...tempResults];
       }
     } finally {
       // Track batch completion

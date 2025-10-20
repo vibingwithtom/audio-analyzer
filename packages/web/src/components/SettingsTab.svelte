@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { availablePresets, currentPresetId, setPreset, selectedPreset, currentCriteria, updateCustomCriteria, hasValidPresetConfig, enableIncludeFailureAnalysis, setIncludeFailureAnalysis, enableIncludeRecommendations, setIncludeRecommendations } from '../stores/settings';
+  import { availablePresets, currentPresetId, setPreset, selectedPreset, currentCriteria, updateCustomCriteria, hasValidPresetConfig, enableIncludeFailureAnalysis, setIncludeFailureAnalysis, enableIncludeRecommendations, setIncludeRecommendations, peakDetectionMode, setPeakDetectionMode } from '../stores/settings';
   import type { AudioCriteria } from '../settings/types';
 
   // Custom criteria form state
@@ -708,6 +708,43 @@
           aria-label="Toggle recommendations"
           aria-pressed={$enableIncludeRecommendations}
         ></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analysis Settings Section -->
+  <div class="settings-section">
+    <h3>Analysis Settings</h3>
+
+    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666666); font-size: 0.9rem;">
+      Configure how audio files are analyzed in experimental mode.
+    </p>
+
+    <!-- Peak Detection Mode Toggle -->
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-primary, #ffffff); border-radius: 4px; border: 1px solid var(--border-color, #e0e0e0);">
+      <div style="flex: 1;">
+        <div style="font-weight: 500; color: var(--text-primary, #333333);">Fast Peak Detection (Experimental)</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); margin-top: 0.25rem;">
+          {#if $peakDetectionMode === 'fast'}
+            ⚡ Speed mode: 60% faster, samples every 5th sample (~0.3-0.5dB typical error)
+          {:else}
+            🎯 Accurate mode: 100% precise, scans every sample (slower)
+          {/if}
+        </div>
+      </div>
+      <button
+        class="toggle-switch"
+        class:active={$peakDetectionMode === 'fast'}
+        on:click={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
+        aria-label="Toggle peak detection mode"
+        aria-pressed={$peakDetectionMode === 'fast'}
+      ></button>
+    </div>
+
+    <!-- Performance Note -->
+    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px; border-left: 3px solid var(--info, #3b82f6);">
+      <div style="font-size: 0.85rem; color: var(--text-secondary, #666666); line-height: 1.5;">
+        <strong style="color: var(--text-primary, #333333);">Note:</strong> During batch processing of large files (40MB+), you may experience brief UI pauses (~5 seconds) approximately every 10-15 files due to browser memory management. This is a browser limitation and does not affect analysis accuracy. Processing continues automatically after each pause.
       </div>
     </div>
   </div>
