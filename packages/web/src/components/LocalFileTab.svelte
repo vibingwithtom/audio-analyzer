@@ -291,9 +291,6 @@
     });
 
     try {
-      const tempResults: AudioResults[] = [];
-      const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
-
       // Performance profiling
       let lastFileTime = performance.now();
       const memoryAvailable = 'memory' in performance;
@@ -336,7 +333,7 @@
               // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
             }
 
-            // Create failed result
+            // Create failed result and add immediately
             const failedResult: AudioResults = {
               filename: file.name,
               fileType: formatRejectedFileType(file.name),
@@ -349,13 +346,7 @@
               error: rejectionReason,
               validation
             };
-            tempResults.push(failedResult);
-
-            // Batch UI updates
-            if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
-              batchResults = [...batchResults, ...tempResults];
-              tempResults.length = 0; // Clear temp array
-            }
+            batchResults = [...batchResults, failedResult];
             continue; // Skip to next file
           }
 
@@ -376,14 +367,8 @@
             (result as any).file = file;
           }
 
-          // Accumulate results
-          tempResults.push(result);
-
-          // Batch UI updates - only update table every N files to prevent constant re-rendering
-          if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
-            batchResults = [...batchResults, ...tempResults];
-            tempResults.length = 0; // Clear temp array
-          }
+          // Add result immediately for smooth UI updates
+          batchResults = [...batchResults, result];
 
           // Performance logging
           const memInfo = memoryAvailable ? (performance as any).memory : null;
@@ -414,8 +399,8 @@
             break;
           }
 
-          // Add error result to temp array (will be flushed with batch)
-          tempResults.push({
+          // Add error result immediately
+          batchResults = [...batchResults, {
             filename: file.name,
             fileSize: file.size,
             fileType: 'unknown',
@@ -431,13 +416,8 @@
                 issue: err instanceof Error ? err.message : 'Unknown error'
               }
             }
-          });
+          }];
         }
-      }
-
-      // Flush any remaining results
-      if (tempResults.length > 0) {
-        batchResults = [...batchResults, ...tempResults];
       }
     } finally {
       // Track batch completion
