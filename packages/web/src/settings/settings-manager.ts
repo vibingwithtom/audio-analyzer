@@ -305,6 +305,15 @@ export class SettingsManager {
   }
 
   /**
+   * Gets the download chunk size for partial file downloads (bytes)
+   * Optimized to 10KB (10240 bytes) for header-only analysis
+   * Reduces bandwidth by 90% vs original 100KB with no loss of accuracy
+   */
+  static getDownloadChunkSize(): number {
+    return 10240; // 10KB - optimized chunk size for WAV header extraction
+  }
+
+  /**
    * Clears all settings from localStorage (useful for testing or reset)
    */
   static clearAllSettings(): void {

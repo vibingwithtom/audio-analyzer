@@ -118,8 +118,8 @@ export class BoxAPI {
       return await this.boxAuth.downloadFile(fileId, (sharedLink || null) as any);
     } else {
       // Partial download optimization for WAV files in audio-only/full mode
-      // WAV headers contain all metadata, only need first ~100KB
-      const partialBlob = await this.boxAuth.downloadFileHeaders(fileId, 102400, (sharedLink || null) as any);
+      // WAV headers contain all metadata, optimized to 10KB chunk size
+      const partialBlob = await this.boxAuth.downloadFileHeaders(fileId, undefined, (sharedLink || null) as any);
       const metadata = await this.getFileMetadata(fileId, sharedLink);
       const file = new File([partialBlob], metadata.name, { type: 'audio/wav' });
 
