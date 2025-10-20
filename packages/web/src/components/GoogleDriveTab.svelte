@@ -710,6 +710,35 @@
           originalFileUrl = null;
           originalFileId = fileMetadata.id;
 
+          // Validate file type BEFORE downloading
+          if (!isFileTypeAllowed(fileMetadata.name, $currentCriteria)) {
+            const rejectionReason = getFileRejectionReason(fileMetadata.name, $currentCriteria);
+            // Set error and failed result WITHOUT downloading
+            error = rejectionReason;
+            results = {
+              filename: fileMetadata.name,
+              fileType: formatRejectedFileType(fileMetadata.name),
+              fileSize: fileMetadata.size || 0,
+              channels: 0,
+              sampleRate: 0,
+              bitDepth: 0,
+              duration: 0,
+              status: 'fail',
+              error: rejectionReason,
+              validation: {
+                fileType: {
+                  status: 'fail',
+                  value: formatRejectedFileType(fileMetadata.name),
+                  issue: rejectionReason
+                }
+              },
+              externalUrl: `https://drive.google.com/file/d/${fileMetadata.id}/view`
+            };
+            resultsMode = $analysisMode;
+            processing = false;
+            return; // Don't download the file
+          }
+
           if ($analysisMode === 'filename-only') {
             const file = new File([], fileMetadata.name, { type: 'application/octet-stream' });
             await processSingleFile(file);
@@ -731,23 +760,52 @@
         originalFileUrl = fileUrl;
         originalFileId = null;
 
+        // Get metadata first to check filename
+        const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
+
+        // Validate file type BEFORE downloading
+        if (!isFileTypeAllowed(metadata.name, $currentCriteria)) {
+          const rejectionReason = getFileRejectionReason(metadata.name, $currentCriteria);
+          // Set error and failed result WITHOUT downloading
+          error = rejectionReason;
+          results = {
+            filename: metadata.name,
+            fileType: formatRejectedFileType(metadata.name),
+            fileSize: metadata.size || 0,
+            channels: 0,
+            sampleRate: 0,
+            bitDepth: 0,
+            duration: 0,
+            status: 'fail',
+            error: rejectionReason,
+            validation: {
+              fileType: {
+                status: 'fail',
+                value: formatRejectedFileType(metadata.name),
+                issue: rejectionReason
+              }
+            },
+            externalUrl: originalFileUrl
+          };
+          resultsMode = $analysisMode;
+          processing = false;
+          return; // Don't download the file
+        }
+
         if ($analysisMode === 'filename-only') {
           // Filename-only mode: Just fetch metadata, don't download file
-          const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
-
           // Create a minimal File object for filename validation
           const file = new File([], metadata.name, { type: 'application/octet-stream' });
           await processSingleFile(file);
         } else {
           // Full or audio-only mode: Download the actual file
-          // Get metadata first to pass filename for optimization
-          const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
           const file = await driveAPI.downloadFileFromUrl(fileUrl, {
             mode: $analysisMode,
             filename: metadata.name
           });
           await processSingleFile(file);
         }
+        processing = false;
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to process Google Drive URL';
