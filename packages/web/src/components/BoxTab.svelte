@@ -13,6 +13,7 @@
   import { analyticsService } from '../services/analytics-service';
   import { AnalysisCancelledError } from '@audio-analyzer/core';
   import { cancelCurrentAnalysis } from '../services/audio-analysis-service';
+  import { FilenameValidator } from '../validation/filename-validator';
 
   let analysisProgress = $state({
     visible: false,
@@ -227,6 +228,30 @@
         const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
         // Set error and failed result
         error = rejectionReason;
+
+        // Build validation object
+        const validation: any = {
+          fileType: {
+            status: 'fail',
+            value: formatRejectedFileType(file.name),
+            issue: rejectionReason
+          }
+        };
+
+        // Add filename validation if preset supports it and we're in filename-only mode
+        const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+        if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+          if (preset.filenameValidationType === 'bilingual-pattern') {
+            const filenameValidation = FilenameValidator.validateBilingual(file.name);
+            validation.filename = {
+              status: filenameValidation.status,
+              value: file.name,
+              issue: filenameValidation.issue
+            };
+          }
+          // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+        }
+
         results = {
           filename: file.name,
           fileType: formatRejectedFileType(file.name),
@@ -237,13 +262,7 @@
           duration: 0,
           status: 'fail',
           error: rejectionReason,
-          validation: {
-            fileType: {
-              status: 'fail',
-              value: formatRejectedFileType(file.name),
-              issue: rejectionReason
-            }
-          },
+          validation,
           externalUrl: originalFileUrl || undefined
         };
         resultsMode = $analysisMode;
@@ -331,6 +350,30 @@
           const rejectionReason = getFileRejectionReason(metadata.name, $currentCriteria);
           // Set error and failed result WITHOUT downloading
           error = rejectionReason;
+
+          // Build validation object
+          const validation: any = {
+            fileType: {
+              status: 'fail',
+              value: formatRejectedFileType(metadata.name),
+              issue: rejectionReason
+            }
+          };
+
+          // Add filename validation if preset supports it and we're in filename-only mode
+          const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+          if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+            if (preset.filenameValidationType === 'bilingual-pattern') {
+              const filenameValidation = FilenameValidator.validateBilingual(metadata.name);
+              validation.filename = {
+                status: filenameValidation.status,
+                value: metadata.name,
+                issue: filenameValidation.issue
+              };
+            }
+            // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+          }
+
           results = {
             filename: metadata.name,
             fileType: formatRejectedFileType(metadata.name),
@@ -341,13 +384,7 @@
             duration: 0,
             status: 'fail',
             error: rejectionReason,
-            validation: {
-              fileType: {
-                status: 'fail',
-                value: formatRejectedFileType(metadata.name),
-                issue: rejectionReason
-              }
-            },
+            validation,
             externalUrl: originalFileUrl
           };
           resultsMode = $analysisMode;
@@ -439,6 +476,30 @@
               // Validate file type against current preset criteria
               if (!isFileTypeAllowed(boxFile.name, $currentCriteria)) {
                 const rejectionReason = getFileRejectionReason(boxFile.name, $currentCriteria);
+
+                // Build validation object
+                const validation: any = {
+                  fileType: {
+                    status: 'fail',
+                    value: formatRejectedFileType(boxFile.name),
+                    issue: rejectionReason
+                  }
+                };
+
+                // Add filename validation if preset supports it and we're in filename-only mode
+                const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+                if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+                  if (preset.filenameValidationType === 'bilingual-pattern') {
+                    const filenameValidation = FilenameValidator.validateBilingual(boxFile.name);
+                    validation.filename = {
+                      status: filenameValidation.status,
+                      value: boxFile.name,
+                      issue: filenameValidation.issue
+                    };
+                  }
+                  // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+                }
+
                 // Create failed result
                 const failedResult: AudioResults = {
                   filename: boxFile.name,
@@ -450,13 +511,7 @@
                   duration: 0,
                   status: 'fail',
                   error: rejectionReason,
-                  validation: {
-                    fileType: {
-                      status: 'fail',
-                      value: formatRejectedFileType(boxFile.name),
-                      issue: rejectionReason
-                    }
-                  }
+                  validation
                 };
                 tempResults.push(failedResult);
 
