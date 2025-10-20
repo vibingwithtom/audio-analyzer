@@ -738,7 +738,7 @@
                   }
 
                   return tooltip;
-                })() : 'Clipping analysis data not available'}
+                })() : 'No clipping detected. Peak levels are below the threshold where clipping could occur.'}
               >
                 {#if result.clippingAnalysis}
                   {@const severity = getClippingSeverity(result.clippingAnalysis)}
@@ -748,6 +748,8 @@
                   {#if severity.eventCount > 0}
                     <span class="subtitle">{severity.eventCount} event{severity.eventCount > 1 ? 's' : ''}</span>
                   {/if}
+                {:else if result.peakDb !== undefined}
+                  <span class="value-success">Not detected</span>
                 {:else}
                   N/A
                 {/if}
