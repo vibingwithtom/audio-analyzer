@@ -55,7 +55,14 @@ npm run deploy:beta
 # 5. Create Pull Request (REQUIRED for main branch)
 gh pr create --base main --head feature/descriptive-name
 
-# 6. Merge PR after CI passes
+# 6. WAIT for Claude Code Review to complete
+# ⚠️ CRITICAL: Always wait for the Claude bot review to finish
+# - Check PR status: gh pr view <PR_NUMBER>
+# - Look for "Claude Code Review" check to show SUCCESS
+# - Review any findings or suggestions from the bot
+# - Only proceed to merge after review is complete and passing
+
+# 7. Merge PR after CI and Claude review pass
 # Production auto-deploys after merge to main
 ```
 
