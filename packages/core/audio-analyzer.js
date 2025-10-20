@@ -9,6 +9,12 @@ export class AudioAnalyzer {
     this.audioBuffer = null;
   }
 
+  // WAV format constants
+  static WAVE_FORMAT_PCM = 1;
+  static WAVE_FORMAT_EXTENSIBLE = 65534; // 0xFFFE
+  static WAVE_FORMAT_NON_PCM_MARKER = -1; // Internal marker for non-PCM extensible formats
+  static EXTENSIBLE_FMT_MIN_SIZE = 36; // Minimum bytes needed to read SubFormat GUID
+
   /**
    * Get the actual file size, checking for partial downloads
    * Google Drive/Box store actual size in file.actualSize for partial downloads
@@ -27,8 +33,10 @@ export class AudioAnalyzer {
 
       let fileType = this.getFileType(file.name);
       if (fileType === 'WAV') {
-        if (wavInfo.audioFormat === 1) {
+        if (wavInfo.audioFormat === AudioAnalyzer.WAVE_FORMAT_PCM) {
           fileType = 'WAV (PCM)';
+        } else if (wavInfo.audioFormat === AudioAnalyzer.WAVE_FORMAT_NON_PCM_MARKER) {
+          fileType = 'WAV (Not PCM)';
         } else if (typeof wavInfo.audioFormat === 'number') {
           fileType = `WAV (Compressed - Format ${wavInfo.audioFormat})`;
         } else {
@@ -116,8 +124,10 @@ export class AudioAnalyzer {
       const wavInfo = this.parseWavHeaders(view);
 
       // If WAV parsing succeeded, it's a real WAV file
-      if (wavInfo.audioFormat === 1) {
+      if (wavInfo.audioFormat === AudioAnalyzer.WAVE_FORMAT_PCM) {
         fileType = 'WAV (PCM)';
+      } else if (wavInfo.audioFormat === AudioAnalyzer.WAVE_FORMAT_NON_PCM_MARKER) {
+        fileType = 'WAV (Not PCM)';
       } else if (typeof wavInfo.audioFormat === 'number') {
         fileType = `WAV (Compressed - Format ${wavInfo.audioFormat})`;
       } else {
@@ -179,7 +189,7 @@ export class AudioAnalyzer {
 
           // Handle WAVE_FORMAT_EXTENSIBLE (format 65534 / 0xFFFE)
           // For extensible format, read the SubFormat GUID to get the actual format
-          if (audioFormat === 65534) {
+          if (audioFormat === AudioAnalyzer.WAVE_FORMAT_EXTENSIBLE) {
             // ExtensibleFormat has:
             // offset + 24: extsize (2 bytes)
             // offset + 26: validbits (2 bytes)
@@ -187,13 +197,17 @@ export class AudioAnalyzer {
             // offset + 32: SubFormat GUID (16 bytes)
 
             // Read the first 4 bytes of SubFormat GUID (little-endian format code)
-            if (offset + 36 <= view.byteLength) {
+            if (offset + AudioAnalyzer.EXTENSIBLE_FMT_MIN_SIZE <= view.byteLength) {
               const subFormatCode = view.getUint32(offset + 32, true);
               // 0x00000001 = PCM (uncompressed)
               if (subFormatCode === 1) {
-                audioFormat = 1; // Treat as standard PCM format
+                audioFormat = AudioAnalyzer.WAVE_FORMAT_PCM; // Treat as standard PCM format
+              } else {
+                // Other SubFormat codes (ADPCM, ALAW, MULAW, etc.)
+                // Mark as non-PCM so it shows "WAV (Not PCM)" and triggers warnings
+                audioFormat = AudioAnalyzer.WAVE_FORMAT_NON_PCM_MARKER;
               }
-              // Other common SubFormat codes:
+              // Common SubFormat codes:
               // 0x00000002 = ADPCM
               // 0x00000006 = ALAW
               // 0x00000007 = MULAW
