@@ -4,6 +4,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentPresetId, availablePresets, currentCriteria, hasValidPresetConfig } from '../stores/settings';
+  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
@@ -262,6 +263,37 @@
         processedFiles = i + 1;
 
         try {
+          // Validate file type against current preset criteria
+          if (!isFileTypeAllowed(file.name, $currentCriteria)) {
+            const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+            // Create failed result
+            const failedResult: AudioResults = {
+              filename: file.name,
+              fileSize: file.size || 0,
+              channels: 0,
+              sampleRate: 0,
+              bitDepth: 0,
+              duration: 0,
+              status: 'fail',
+              error: rejectionReason,
+              validation: {
+                fileType: {
+                  status: 'fail',
+                  value: '',
+                  issue: rejectionReason
+                }
+              }
+            };
+            tempResults.push(failedResult);
+
+            // Batch UI updates
+            if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
+              batchResults = [...batchResults, ...tempResults];
+              tempResults.length = 0; // Clear temp array
+            }
+            continue; // Skip to next file
+          }
+
           const fileStartTime = performance.now();
 
           // Reset progress to 0 for new file
@@ -382,6 +414,29 @@
     isBatchMode: boolean = false,
     progressCallback?: (message: string, progress: number) => void
   ): Promise<AudioResults> {
+    // Validate file type against current preset criteria
+    if (!isFileTypeAllowed(file.name, $currentCriteria)) {
+      const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+      // Return failed result without analyzing
+      return {
+        filename: file.name,
+        fileSize: file.size || 0,
+        channels: 0,
+        sampleRate: 0,
+        bitDepth: 0,
+        duration: 0,
+        status: 'fail',
+        error: rejectionReason,
+        validation: {
+          fileType: {
+            status: 'fail',
+            value: '',
+            issue: rejectionReason
+          }
+        }
+      };
+    }
+
     // Use shared analysis service
     return await analyzeAudioFile(file, {
       analysisMode: $analysisMode,

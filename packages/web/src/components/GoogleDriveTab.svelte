@@ -5,6 +5,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentPresetId, availablePresets, currentCriteria, hasValidPresetConfig } from '../stores/settings';
+  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { GoogleDriveAPI, type DriveFileMetadata } from '../services/google-drive-api';
@@ -324,6 +325,32 @@
 
           const promise = (async () => {
             try {
+              // Validate file type against current preset criteria
+              if (!isFileTypeAllowed(driveFile.name, $currentCriteria)) {
+                const rejectionReason = getFileRejectionReason(driveFile.name, $currentCriteria);
+                // Create failed result
+                const failedResult: AudioResults = {
+                  filename: driveFile.name,
+                  fileSize: driveFile.size || 0,
+                  channels: 0,
+                  sampleRate: 0,
+                  bitDepth: 0,
+                  duration: 0,
+                  status: 'fail',
+                  error: rejectionReason,
+                  validation: {
+                    fileType: {
+                      status: 'fail',
+                      value: '',
+                      issue: rejectionReason
+                    }
+                  }
+                };
+                batchResults = [...batchResults, failedResult];
+                processedFiles = batchResults.length;
+                return;
+              }
+
               // Check if filename-only mode - don't download the actual file
               let file: File;
               if ($analysisMode === 'filename-only') {

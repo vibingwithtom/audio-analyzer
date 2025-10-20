@@ -5,6 +5,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentCriteria, currentPresetId, availablePresets, hasValidPresetConfig } from '../stores/settings';
+  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { BoxAPI } from '../services/box-api';
@@ -374,6 +375,32 @@
 
           const promise = (async () => {
             try {
+              // Validate file type against current preset criteria
+              if (!isFileTypeAllowed(boxFile.name, $currentCriteria)) {
+                const rejectionReason = getFileRejectionReason(boxFile.name, $currentCriteria);
+                // Create failed result
+                const failedResult: AudioResults = {
+                  filename: boxFile.name,
+                  fileSize: boxFile.size || 0,
+                  channels: 0,
+                  sampleRate: 0,
+                  bitDepth: 0,
+                  duration: 0,
+                  status: 'fail',
+                  error: rejectionReason,
+                  validation: {
+                    fileType: {
+                      status: 'fail',
+                      value: '',
+                      issue: rejectionReason
+                    }
+                  }
+                };
+                batchResults = [...batchResults, failedResult];
+                processedFiles = batchResults.length;
+                return;
+              }
+
               // Check if filename-only mode - don't download the actual file
               let file: File;
               if ($analysisMode === 'filename-only') {
