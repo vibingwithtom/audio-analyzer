@@ -325,7 +325,9 @@
           const taskId = index;
           index++;
 
-          const promise = (async () => {
+          // CRITICAL: Add placeholder to Map FIRST to prevent race condition
+          // where async function completes and tries to delete before being added
+          const promise = Promise.resolve().then(async () => {
             try {
               // Validate file type against current preset criteria
               if (!isFileTypeAllowed(driveFile.name, $currentCriteria)) {
@@ -432,7 +434,7 @@
               // Remove this task from inProgress when complete
               inProgress.delete(taskId);
             }
-          })();
+          });
 
           inProgress.set(taskId, promise);
         }

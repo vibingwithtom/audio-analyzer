@@ -159,6 +159,33 @@
     currentFile = file;
 
     try {
+      // Validate file type against current preset criteria BEFORE analyzing
+      if (!isFileTypeAllowed(file.name, $currentCriteria)) {
+        const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+        // Set error and failed result
+        error = rejectionReason;
+        results = {
+          filename: file.name,
+          fileType: formatRejectedFileType(file.name),
+          fileSize: file.size || 0,
+          channels: 0,
+          sampleRate: 0,
+          bitDepth: 0,
+          duration: 0,
+          status: 'fail',
+          error: rejectionReason,
+          validation: {
+            fileType: {
+              status: 'fail',
+              value: formatRejectedFileType(file.name),
+              issue: rejectionReason
+            }
+          }
+        };
+        resultsMode = $analysisMode;
+        return; // Don't analyze the file
+      }
+
       // Use shared analysis service
       const analysisResults = await analyzeAudioFile(file, {
         analysisMode: $analysisMode,
