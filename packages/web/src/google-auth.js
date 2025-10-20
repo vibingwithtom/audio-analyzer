@@ -1,4 +1,5 @@
 import { GOOGLE_CONFIG } from './config.js';
+import { SettingsManager } from './settings/settings-manager';
 
 class GoogleAuth {
   constructor() {
@@ -340,11 +341,16 @@ class GoogleAuth {
     }
   }
 
-  async downloadFileHeaders(fileId, bytesLimit = 102400) {
+  async downloadFileHeaders(fileId, bytesLimit = null) {
+    // Use bytesLimit from settings if not explicitly provided
+    if (bytesLimit === null) {
+      bytesLimit = SettingsManager.getDownloadChunkSize();
+    }
+
     const token = await this.getValidToken();
 
     try {
-      // Use HTTP Range header to download only first 100KB
+      // Use HTTP Range header to download only the configured chunk size
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         {

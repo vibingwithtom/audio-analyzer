@@ -1,4 +1,5 @@
 import { BOX_CONFIG } from './config.js';
+import { SettingsManager } from './settings/settings-manager';
 
 class BoxAuth {
   constructor() {
@@ -278,7 +279,12 @@ class BoxAuth {
     }
   }
 
-  async downloadFileHeaders(fileId, bytesLimit = 102400, sharedLink = null) {
+  async downloadFileHeaders(fileId, bytesLimit = null, sharedLink = null) {
+    // Use bytesLimit from settings if not explicitly provided
+    if (bytesLimit === null) {
+      bytesLimit = SettingsManager.getDownloadChunkSize();
+    }
+
     try {
       const headers = {
         'Range': `bytes=0-${bytesLimit - 1}`
