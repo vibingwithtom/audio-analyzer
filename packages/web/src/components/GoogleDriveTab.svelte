@@ -232,6 +232,43 @@
     analysisProgress.cancelling = false;
 
     try {
+      // Validate file type against current preset criteria BEFORE analyzing
+      if (!isFileTypeAllowed(file.name, $currentCriteria)) {
+        const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+        // Set error and failed result
+        error = rejectionReason;
+
+        // Determine external URL
+        let externalUrl: string | undefined;
+        if (originalFileUrl) {
+          externalUrl = originalFileUrl;
+        } else if (originalFileId) {
+          externalUrl = `https://drive.google.com/file/d/${originalFileId}/view`;
+        }
+
+        results = {
+          filename: file.name,
+          fileType: formatRejectedFileType(file.name),
+          fileSize: file.size || 0,
+          channels: 0,
+          sampleRate: 0,
+          bitDepth: 0,
+          duration: 0,
+          status: 'fail',
+          error: rejectionReason,
+          validation: {
+            fileType: {
+              status: 'fail',
+              value: formatRejectedFileType(file.name),
+              issue: rejectionReason
+            }
+          },
+          externalUrl
+        };
+        resultsMode = $analysisMode;
+        return; // Don't analyze the file
+      }
+
       // Analyze file (pure function)
       const progressCallback = createProgressCallback(file.name, () => 1, 1);
       const analysisResults = await analyzeFile(file, false, progressCallback);
