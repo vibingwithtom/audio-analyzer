@@ -5,6 +5,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentPresetId, availablePresets, currentCriteria, hasValidPresetConfig } from '../stores/settings';
+  import { isFileTypeAllowed, getFileRejectionReason, formatRejectedFileType } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { GoogleDriveAPI, type DriveFileMetadata } from '../services/google-drive-api';
@@ -231,6 +232,43 @@
     analysisProgress.cancelling = false;
 
     try {
+      // Validate file type against current preset criteria BEFORE analyzing
+      if (!isFileTypeAllowed(file.name, $currentCriteria)) {
+        const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+        // Set error and failed result
+        error = rejectionReason;
+
+        // Determine external URL
+        let externalUrl: string | undefined;
+        if (originalFileUrl) {
+          externalUrl = originalFileUrl;
+        } else if (originalFileId) {
+          externalUrl = `https://drive.google.com/file/d/${originalFileId}/view`;
+        }
+
+        results = {
+          filename: file.name,
+          fileType: formatRejectedFileType(file.name),
+          fileSize: file.size || 0,
+          channels: 0,
+          sampleRate: 0,
+          bitDepth: 0,
+          duration: 0,
+          status: 'fail',
+          error: rejectionReason,
+          validation: {
+            fileType: {
+              status: 'fail',
+              value: formatRejectedFileType(file.name),
+              issue: rejectionReason
+            }
+          },
+          externalUrl
+        };
+        resultsMode = $analysisMode;
+        return; // Don't analyze the file
+      }
+
       // Analyze file (pure function)
       const progressCallback = createProgressCallback(file.name, () => 1, 1);
       const analysisResults = await analyzeFile(file, false, progressCallback);
@@ -306,6 +344,8 @@
     const concurrency = 3; // Process 3 files at once
     let index = 0;
     const inProgress: Map<number, Promise<void>> = new Map();
+    const tempResults: AudioResults[] = []; // Accumulate results here
+    const UI_UPDATE_INTERVAL = 5; // Update UI every 5 results to reduce re-renders
 
     try {
       while (index < driveFiles.length || inProgress.size > 0) {
@@ -322,8 +362,43 @@
           const taskId = index;
           index++;
 
-          const promise = (async () => {
+          // CRITICAL: Add placeholder to Map FIRST to prevent race condition
+          // where async function completes and tries to delete before being added
+          const promise = Promise.resolve().then(async () => {
             try {
+              // Validate file type against current preset criteria
+              if (!isFileTypeAllowed(driveFile.name, $currentCriteria)) {
+                const rejectionReason = getFileRejectionReason(driveFile.name, $currentCriteria);
+                // Create failed result
+                const failedResult: AudioResults = {
+                  filename: driveFile.name,
+                  fileType: formatRejectedFileType(driveFile.name),
+                  fileSize: driveFile.size || 0,
+                  channels: 0,
+                  sampleRate: 0,
+                  bitDepth: 0,
+                  duration: 0,
+                  status: 'fail',
+                  error: rejectionReason,
+                  validation: {
+                    fileType: {
+                      status: 'fail',
+                      value: formatRejectedFileType(driveFile.name),
+                      issue: rejectionReason
+                    }
+                  }
+                };
+                tempResults.push(failedResult);
+
+                // Batch UI updates to reduce re-renders
+                if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                  batchResults = [...batchResults, ...tempResults];
+                  processedFiles = batchResults.length;
+                  tempResults.length = 0; // Clear temp array
+                }
+                return;
+              }
+
               // Check if filename-only mode - don't download the actual file
               let file: File;
               if ($analysisMode === 'filename-only') {
@@ -346,9 +421,15 @@
               // Add external URL for Google Drive files
               result.externalUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
 
-              // Add to results and increment processed count
-              batchResults = [...batchResults, result];
-              processedFiles = batchResults.length;
+              // Add to temp results
+              tempResults.push(result);
+
+              // Batch UI updates to reduce re-renders
+              if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                batchResults = [...batchResults, ...tempResults];
+                processedFiles = batchResults.length;
+                tempResults.length = 0; // Clear temp array
+              }
 
               // If this was the currently displayed file, clear it so next file can be shown
               if (currentDisplayedFile === driveFile.name) {
@@ -378,13 +459,19 @@
                 status: 'error',
                 error: err instanceof Error ? err.message : 'Unknown error'
               };
-              batchResults = [...batchResults, errorResult];
-              processedFiles = batchResults.length;
+              tempResults.push(errorResult);
+
+              // Batch UI updates to reduce re-renders
+              if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                batchResults = [...batchResults, ...tempResults];
+                processedFiles = batchResults.length;
+                tempResults.length = 0; // Clear temp array
+              }
             } finally {
               // Remove this task from inProgress when complete
               inProgress.delete(taskId);
             }
-          })();
+          });
 
           inProgress.set(taskId, promise);
         }
@@ -393,6 +480,13 @@
         if (inProgress.size > 0) {
           await Promise.race(Array.from(inProgress.values()));
         }
+      }
+
+      // Flush any remaining temp results
+      if (tempResults.length > 0) {
+        batchResults = [...batchResults, ...tempResults];
+        processedFiles = batchResults.length;
+        tempResults.length = 0;
       }
 
     } catch (err) {
@@ -616,6 +710,35 @@
           originalFileUrl = null;
           originalFileId = fileMetadata.id;
 
+          // Validate file type BEFORE downloading
+          if (!isFileTypeAllowed(fileMetadata.name, $currentCriteria)) {
+            const rejectionReason = getFileRejectionReason(fileMetadata.name, $currentCriteria);
+            // Set error and failed result WITHOUT downloading
+            error = rejectionReason;
+            results = {
+              filename: fileMetadata.name,
+              fileType: formatRejectedFileType(fileMetadata.name),
+              fileSize: fileMetadata.size || 0,
+              channels: 0,
+              sampleRate: 0,
+              bitDepth: 0,
+              duration: 0,
+              status: 'fail',
+              error: rejectionReason,
+              validation: {
+                fileType: {
+                  status: 'fail',
+                  value: formatRejectedFileType(fileMetadata.name),
+                  issue: rejectionReason
+                }
+              },
+              externalUrl: `https://drive.google.com/file/d/${fileMetadata.id}/view`
+            };
+            resultsMode = $analysisMode;
+            processing = false;
+            return; // Don't download the file
+          }
+
           if ($analysisMode === 'filename-only') {
             const file = new File([], fileMetadata.name, { type: 'application/octet-stream' });
             await processSingleFile(file);
@@ -637,23 +760,52 @@
         originalFileUrl = fileUrl;
         originalFileId = null;
 
+        // Get metadata first to check filename
+        const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
+
+        // Validate file type BEFORE downloading
+        if (!isFileTypeAllowed(metadata.name, $currentCriteria)) {
+          const rejectionReason = getFileRejectionReason(metadata.name, $currentCriteria);
+          // Set error and failed result WITHOUT downloading
+          error = rejectionReason;
+          results = {
+            filename: metadata.name,
+            fileType: formatRejectedFileType(metadata.name),
+            fileSize: metadata.size || 0,
+            channels: 0,
+            sampleRate: 0,
+            bitDepth: 0,
+            duration: 0,
+            status: 'fail',
+            error: rejectionReason,
+            validation: {
+              fileType: {
+                status: 'fail',
+                value: formatRejectedFileType(metadata.name),
+                issue: rejectionReason
+              }
+            },
+            externalUrl: originalFileUrl
+          };
+          resultsMode = $analysisMode;
+          processing = false;
+          return; // Don't download the file
+        }
+
         if ($analysisMode === 'filename-only') {
           // Filename-only mode: Just fetch metadata, don't download file
-          const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
-
           // Create a minimal File object for filename validation
           const file = new File([], metadata.name, { type: 'application/octet-stream' });
           await processSingleFile(file);
         } else {
           // Full or audio-only mode: Download the actual file
-          // Get metadata first to pass filename for optimization
-          const metadata = await driveAPI.getFileMetadataFromUrl(fileUrl);
           const file = await driveAPI.downloadFileFromUrl(fileUrl, {
             mode: $analysisMode,
             filename: metadata.name
           });
           await processSingleFile(file);
         }
+        processing = false;
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to process Google Drive URL';

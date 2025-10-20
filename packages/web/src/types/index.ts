@@ -23,6 +23,7 @@ export interface AudioResults {
   externalUrl?: string; // External URL for Box/Google Drive
   validation?: ValidationResults;
   isMetadataOnly?: boolean;
+  error?: string; // Error message for failed/error status
   // Experimental analysis properties
   peakDb?: number;
   noiseFloor?: number;
