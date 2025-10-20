@@ -357,6 +357,8 @@
     const concurrency = 3; // Process 3 files at once
     let index = 0;
     const inProgress: Map<number, Promise<void>> = new Map();
+    const tempResults: AudioResults[] = []; // Accumulate results here
+    const UI_UPDATE_INTERVAL = 5; // Update UI every 5 results to reduce re-renders
 
     try {
       while (index < boxFiles.length || inProgress.size > 0) {
@@ -397,8 +399,14 @@
                     }
                   }
                 };
-                batchResults = [...batchResults, failedResult];
-                processedFiles = batchResults.length;
+                tempResults.push(failedResult);
+
+                // Batch UI updates to reduce re-renders
+                if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                  batchResults = [...batchResults, ...tempResults];
+                  processedFiles = batchResults.length;
+                  tempResults.length = 0; // Clear temp array
+                }
                 return;
               }
 
@@ -424,9 +432,15 @@
               // Add external URL for Box files
               result.externalUrl = `https://app.box.com/file/${boxFile.id}`;
 
-              // Add to results and increment processed count
-              batchResults = [...batchResults, result];
-              processedFiles = batchResults.length;
+              // Add to temp results
+              tempResults.push(result);
+
+              // Batch UI updates to reduce re-renders
+              if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                batchResults = [...batchResults, ...tempResults];
+                processedFiles = batchResults.length;
+                tempResults.length = 0; // Clear temp array
+              }
 
               // If this was the currently displayed file, clear it so next file can be shown
               if (currentDisplayedFile === boxFile.name) {
@@ -453,8 +467,14 @@
                 status: 'error',
                 error: err instanceof Error ? err.message : 'Unknown error'
               };
-              batchResults = [...batchResults, errorResult];
-              processedFiles = batchResults.length;
+              tempResults.push(errorResult);
+
+              // Batch UI updates to reduce re-renders
+              if (tempResults.length >= UI_UPDATE_INTERVAL) {
+                batchResults = [...batchResults, ...tempResults];
+                processedFiles = batchResults.length;
+                tempResults.length = 0; // Clear temp array
+              }
             } finally {
               // Remove this task from inProgress when complete
               inProgress.delete(taskId);
@@ -468,6 +488,13 @@
         if (inProgress.size > 0) {
           await Promise.race(Array.from(inProgress.values()));
         }
+      }
+
+      // Flush any remaining temp results
+      if (tempResults.length > 0) {
+        batchResults = [...batchResults, ...tempResults];
+        processedFiles = batchResults.length;
+        tempResults.length = 0;
       }
 
     } catch (err) {
