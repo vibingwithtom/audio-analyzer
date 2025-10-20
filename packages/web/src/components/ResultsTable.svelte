@@ -672,7 +672,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each results as result (result.filename)}
+          {#each results as result, index (`${result.filename}-${index}`)}
             {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
               <td>{result.filename}</td>
@@ -1033,7 +1033,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each results as result (result.filename)}
+      {#each results as result, index (`${result.filename}-${index}`)}
         <tr class:status-pass={result.status === 'pass'} class:status-warning={result.status === 'warning'} class:status-fail={result.status === 'fail'}>
           <td
             class:validation-pass={getValidationStatus(result, 'filename') === 'pass'}
