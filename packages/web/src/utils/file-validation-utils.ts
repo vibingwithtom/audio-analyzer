@@ -41,6 +41,28 @@ export function getFileTypeDisplay(criteria: AudioCriteria | null): string {
 }
 
 /**
+ * Get file extension from filename
+ *
+ * @param filename - The filename
+ * @returns File extension in uppercase (e.g., "MP3", "WAV") or empty string if no extension
+ */
+export function getFileExtension(filename: string): string {
+  const extension = filename.split('.').pop()?.toLowerCase() || '';
+  return extension ? extension.toUpperCase() : '';
+}
+
+/**
+ * Format file type display for rejected files
+ *
+ * @param filename - The rejected filename
+ * @returns Formatted string like "Unknown (Maybe MP3)"
+ */
+export function formatRejectedFileType(filename: string): string {
+  const extension = getFileExtension(filename);
+  return extension ? `Unknown (Maybe ${extension})` : 'Unknown';
+}
+
+/**
  * Get reason message for rejected file
  *
  * @param filename - The rejected filename

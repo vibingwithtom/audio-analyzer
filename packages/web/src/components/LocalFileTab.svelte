@@ -4,7 +4,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentPresetId, availablePresets, currentCriteria, hasValidPresetConfig } from '../stores/settings';
-  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
+  import { isFileTypeAllowed, getFileRejectionReason, formatRejectedFileType } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
@@ -269,6 +269,7 @@
             // Create failed result
             const failedResult: AudioResults = {
               filename: file.name,
+              fileType: formatRejectedFileType(file.name),
               fileSize: file.size || 0,
               channels: 0,
               sampleRate: 0,
@@ -279,7 +280,7 @@
               validation: {
                 fileType: {
                   status: 'fail',
-                  value: '',
+                  value: formatRejectedFileType(file.name),
                   issue: rejectionReason
                 }
               }
@@ -420,6 +421,7 @@
       // Return failed result without analyzing
       return {
         filename: file.name,
+        fileType: formatRejectedFileType(file.name),
         fileSize: file.size || 0,
         channels: 0,
         sampleRate: 0,
@@ -430,7 +432,7 @@
         validation: {
           fileType: {
             status: 'fail',
-            value: '',
+            value: formatRejectedFileType(file.name),
             issue: rejectionReason
           }
         }

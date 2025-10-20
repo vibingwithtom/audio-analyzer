@@ -5,7 +5,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentPresetId, availablePresets, currentCriteria, hasValidPresetConfig } from '../stores/settings';
-  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
+  import { isFileTypeAllowed, getFileRejectionReason, formatRejectedFileType } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { GoogleDriveAPI, type DriveFileMetadata } from '../services/google-drive-api';
@@ -331,6 +331,7 @@
                 // Create failed result
                 const failedResult: AudioResults = {
                   filename: driveFile.name,
+                  fileType: formatRejectedFileType(driveFile.name),
                   fileSize: driveFile.size || 0,
                   channels: 0,
                   sampleRate: 0,
@@ -341,7 +342,7 @@
                   validation: {
                     fileType: {
                       status: 'fail',
-                      value: '',
+                      value: formatRejectedFileType(driveFile.name),
                       issue: rejectionReason
                     }
                   }

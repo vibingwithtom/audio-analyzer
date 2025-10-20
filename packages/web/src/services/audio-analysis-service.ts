@@ -5,6 +5,7 @@ import type { AnalysisMode } from '../stores/analysisMode';
 import type { PresetConfig } from '../settings/types';
 import { analyticsService } from './analytics-service';
 import { SettingsManager } from '../settings/settings-manager';
+import { formatRejectedFileType } from '../utils/file-validation-utils';
 
 // Track all active LevelAnalyzer instances for concurrent batch processing
 const activeLevelAnalyzers = new Set<LevelAnalyzer>();
@@ -13,6 +14,37 @@ export function cancelCurrentAnalysis() {
   // Cancel all active analyzers (for batch processing)
   activeLevelAnalyzers.forEach(analyzer => analyzer.cancelAnalysis());
   activeLevelAnalyzers.clear();
+}
+
+/**
+ * Check if detected file type is allowed based on criteria
+ * Handles special formats like "M4A (wrong extension)" by extracting actual format
+ */
+function isDetectedFormatAllowed(detectedFileType: string, criteria: any): boolean {
+  if (!criteria || !criteria.fileType) {
+    return true; // No restrictions
+  }
+
+  // Extract actual format from strings like "M4A (wrong extension)" or "WAV (PCM)"
+  const formatMatch = detectedFileType.match(/^([A-Z0-9]+)/i);
+  if (!formatMatch) {
+    return false; // Can't determine format
+  }
+
+  const actualFormat = formatMatch[1].toLowerCase();
+
+  // Handle both string and array formats for fileType
+  if (Array.isArray(criteria.fileType)) {
+    // Custom preset format: ['wav', 'mp3'] or test format: ['WAV', 'MP3']
+    if (criteria.fileType.length === 0) return true;
+    // Case-insensitive comparison
+    return criteria.fileType.some((type: string) => type.toLowerCase() === actualFormat);
+  } else if (typeof criteria.fileType === 'string') {
+    // Legacy/test format: 'WAV'
+    return criteria.fileType.toLowerCase() === actualFormat;
+  }
+
+  return true; // Unknown format, allow it
 }
 
 export interface AnalysisOptions {
@@ -185,6 +217,36 @@ async function analyzeFullFile(
 
   try {
     const basicResults = await audioAnalyzer.analyzeFile(file);
+
+    // Check if detected file type is allowed (for mislabeled files)
+    // This catches files like "file.wav" that are actually M4A
+    if (criteria && basicResults.fileType && !isDetectedFormatAllowed(basicResults.fileType, criteria)) {
+      // File was detected as wrong format - abort early
+      const actualSize = (file as any).actualSize || file.size;
+      const allowedTypes = Array.isArray(criteria.fileType)
+        ? criteria.fileType.map((t: string) => t.toUpperCase()).join(', ')
+        : 'WAV';
+      const errorMessage = `File type not supported. Detected as ${basicResults.fileType}. This preset accepts: ${allowedTypes}`;
+
+      return {
+        filename,
+        fileType: basicResults.fileType,
+        fileSize: actualSize,
+        channels: 0,
+        sampleRate: 0,
+        bitDepth: 0,
+        duration: 0,
+        status: 'fail',
+        error: errorMessage,
+        validation: {
+          fileType: {
+            status: 'fail',
+            value: basicResults.fileType,
+            issue: errorMessage
+          }
+        }
+      };
+    }
 
     // Use actualSize if available (for partial downloads), otherwise use file.size
     const actualSize = (file as any).actualSize || file.size;

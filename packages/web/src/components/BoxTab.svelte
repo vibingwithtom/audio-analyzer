@@ -5,7 +5,7 @@
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
   import { currentCriteria, currentPresetId, availablePresets, hasValidPresetConfig } from '../stores/settings';
-  import { isFileTypeAllowed, getFileRejectionReason } from '../utils/file-validation-utils';
+  import { isFileTypeAllowed, getFileRejectionReason, formatRejectedFileType } from '../utils/file-validation-utils';
   import { currentTab } from '../stores/tabs';
   import { analysisMode, setAnalysisMode, type AnalysisMode } from '../stores/analysisMode';
   import { BoxAPI } from '../services/box-api';
@@ -381,6 +381,7 @@
                 // Create failed result
                 const failedResult: AudioResults = {
                   filename: boxFile.name,
+                  fileType: formatRejectedFileType(boxFile.name),
                   fileSize: boxFile.size || 0,
                   channels: 0,
                   sampleRate: 0,
@@ -391,7 +392,7 @@
                   validation: {
                     fileType: {
                       status: 'fail',
-                      value: '',
+                      value: formatRejectedFileType(boxFile.name),
                       issue: rejectionReason
                     }
                   }
