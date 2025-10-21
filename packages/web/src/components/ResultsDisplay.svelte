@@ -822,9 +822,9 @@
       {#if !$currentPresetId?.startsWith('auditions-') && !$isSimplifiedMode}
         {#if $analysisMode === 'experimental'}
           <div class="mode-switcher">
-            💡 Want to see basic file properties? Switch to
-            <a href="#" on:click|preventDefault={() => setAnalysisMode('audio-only')}>
-              Audio Analysis
+            💡 Want to check just filenames without analyzing audio? Switch to
+            <a href="#" on:click|preventDefault={() => setAnalysisMode('filename-only')}>
+              Filename-Only
             </a> mode
           </div>
         {:else if $analysisMode === 'audio-only'}
@@ -868,9 +868,9 @@
       {#if !$currentPresetId?.startsWith('auditions-') && !$isSimplifiedMode}
         {#if $analysisMode === 'experimental'}
           <div class="mode-switcher">
-            💡 Want to see basic file properties? Switch to
-            <a href="#" on:click|preventDefault={() => setAnalysisMode('audio-only')}>
-              Audio Analysis
+            💡 Want to check just filenames without analyzing audio? Switch to
+            <a href="#" on:click|preventDefault={() => setAnalysisMode('filename-only')}>
+              Filename-Only
             </a> mode
           </div>
         {:else if $analysisMode === 'audio-only'}
