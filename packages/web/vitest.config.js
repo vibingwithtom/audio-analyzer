@@ -1,11 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
 
 export default defineConfig({
-  // Note: Svelte plugin removed from test config due to compatibility issue
-  // with @sveltejs/vite-plugin-svelte v6.x + Vitest
-  // Phase 5.2b: Svelte component tests exist in tests/components but will be
-  // tested manually via dev server until ecosystem stabilizes
+  plugins: [svelte({ hot: !process.env.VITEST })],
   test: {
     globals: true,
     environment: 'jsdom',
@@ -13,7 +11,6 @@ export default defineConfig({
     exclude: [
       'node_modules/**',
       'dist/**',
-      'tests/components/**', // Exclude Svelte component tests until plugin compatible
       'tests/e2e/**' // Exclude Playwright E2E tests (run separately)
     ],
     // Limit parallelism to reduce memory usage
