@@ -515,6 +515,23 @@
     overflow: hidden; /* Clips buttons and shadow at table boundaries, not container boundaries */
   }
 
+  /* Cover scrollbar under sticky columns */
+  .table-with-controls::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 370px; /* Width of sticky columns (250px + 120px) */
+    height: 20px; /* Height of typical scrollbar */
+    background: var(--bg-primary, #ffffff);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  :global([data-theme="dark"]) .table-with-controls::after {
+    background: var(--bg-primary, #1e1e1e);
+  }
+
   /* Table toolbar with expand button */
   .table-toolbar {
     display: flex;
@@ -552,11 +569,60 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
+  /* Remove overflow from table inside experimental wrapper to allow sticky */
+  .experimental-table-wrapper .results-table {
+    overflow: visible;
+    width: max-content; /* Force table to be as wide as its content */
+    min-width: 100%; /* But at least fill the container */
+  }
+
   /* Sticky header for experimental table */
   .experimental-table-wrapper thead {
     position: sticky;
     top: 0;
     z-index: 10;
+  }
+
+  /* Sticky first column (Filename) for experimental table */
+  .experimental-table-wrapper table th:first-child,
+  .experimental-table-wrapper table td:first-child {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--bg-primary, #ffffff);
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+    width: 250px;
+    max-width: 250px;
+  }
+
+  .experimental-table-wrapper table thead th:first-child {
+    z-index: 11; /* Higher than body cells, same level as sticky header */
+  }
+
+  /* Sticky second column (Status) for experimental table */
+  .experimental-table-wrapper table th:nth-child(2),
+  .experimental-table-wrapper table td:nth-child(2) {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 250px; /* Position after Filename column (250px fixed width) */
+    z-index: 2;
+    background: var(--bg-primary, #ffffff);
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+    width: 120px;
+    max-width: 120px;
+  }
+
+  .experimental-table-wrapper table thead th:nth-child(2) {
+    z-index: 11;
+  }
+
+  /* Dark mode support */
+  :global([data-theme="dark"]) .experimental-table-wrapper table th:first-child,
+  :global([data-theme="dark"]) .experimental-table-wrapper table td:first-child,
+  :global([data-theme="dark"]) .experimental-table-wrapper table th:nth-child(2),
+  :global([data-theme="dark"]) .experimental-table-wrapper table td:nth-child(2) {
+    background: var(--bg-primary, #1e1e1e);
   }
 
   /* Shadow gradient overlay - stays fixed at right edge */
@@ -615,8 +681,8 @@
   }
 
   .scroll-button.left {
-    left: 0;
-    border-radius: 8px 0 0 8px;
+    left: 370px; /* Position after sticky Filename (250px) + Status (120px) columns */
+    border-radius: 0; /* No rounded corners since it's mid-table */
   }
 
   .scroll-button.right {
