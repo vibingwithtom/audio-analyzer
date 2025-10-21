@@ -879,14 +879,16 @@
                   return tooltip;
                 })()}
               >
-                {#if result.status === 'fail' || result.status === 'error'}
-                  --
-                {:else}
+                {#if result.leadingSilence !== undefined}
                   <div>
                     <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
                     <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
                     <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
                   </div>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
+                {:else}
+                  N/A
                 {/if}
               </td>
               <td>
