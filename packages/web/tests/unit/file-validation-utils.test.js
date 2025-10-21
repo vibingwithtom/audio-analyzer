@@ -62,7 +62,7 @@ describe('File Validation Utilities', () => {
         expect(isFileTypeAllowed('image.jpg', criteria)).toBe(false);
       });
 
-      it('should reject files when preset has no allowed types', () => {
+      it('should allow files when preset has empty file type array (allow all)', () => {
         const criteria = { fileType: [] };
         expect(isFileTypeAllowed('audio.wav', criteria)).toBe(true); // Empty array means allow all
       });
@@ -99,6 +99,21 @@ describe('File Validation Utilities', () => {
         expect(isFileTypeAllowed('audio.wav.backup', criteria)).toBe(false);
         expect(isFileTypeAllowed('audio.wavx', criteria)).toBe(false);
       });
+
+      it('should handle empty string filenames', () => {
+        const criteria = { fileType: ['wav'] };
+        expect(isFileTypeAllowed('', criteria)).toBe(false);
+      });
+
+      it('should reject path traversal attempts in filenames', () => {
+        const criteria = { fileType: ['wav'] };
+        // Path traversal attempts should be treated as invalid extensions
+        expect(isFileTypeAllowed('../../../etc/passwd.wav', criteria)).toBe(true);
+        expect(isFileTypeAllowed('../../audio.mp3', criteria)).toBe(false);
+        expect(isFileTypeAllowed('../file.wav', criteria)).toBe(true);
+        // Absolute paths treated as files with multiple dots
+        expect(isFileTypeAllowed('/etc/passwd.wav', criteria)).toBe(true);
+      });
     });
   });
 
@@ -130,6 +145,17 @@ describe('File Validation Utilities', () => {
       expect(getFileExtension('.hidden.wav')).toBe('WAV');
       // Hidden files without extension: split('.hidden') -> ['', 'hidden'] -> pop() -> 'hidden'
       expect(getFileExtension('.hidden')).toBe('HIDDEN');
+    });
+
+    it('should handle empty string filenames', () => {
+      expect(getFileExtension('')).toBe('');
+    });
+
+    it('should handle path traversal in filenames', () => {
+      // Path components are treated as part of the filename
+      expect(getFileExtension('../file.wav')).toBe('WAV');
+      expect(getFileExtension('../../audio.mp3')).toBe('MP3');
+      expect(getFileExtension('/etc/passwd.wav')).toBe('WAV');
     });
   });
 
