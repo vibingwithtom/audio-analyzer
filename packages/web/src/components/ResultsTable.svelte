@@ -68,8 +68,10 @@
   function checkScroll() {
     if (tableWrapper) {
       hasHorizontalScroll = tableWrapper.scrollWidth > tableWrapper.clientWidth;
-      canScrollLeft = tableWrapper.scrollLeft > 0;
-      canScrollRight = tableWrapper.scrollLeft < tableWrapper.scrollWidth - tableWrapper.clientWidth;
+      canScrollLeft = tableWrapper.scrollLeft > 1; // 1px tolerance for rounding
+      // Add 1px tolerance to account for sub-pixel rounding in browsers
+      const maxScroll = tableWrapper.scrollWidth - tableWrapper.clientWidth;
+      canScrollRight = tableWrapper.scrollLeft < maxScroll - 1;
     }
   }
 
@@ -625,6 +627,8 @@
     box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
     width: 250px;
     max-width: 250px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .experimental-table-wrapper table thead th:first-child {
