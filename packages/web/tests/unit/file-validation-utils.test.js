@@ -129,11 +129,11 @@ describe('File Validation Utilities', () => {
       expect(getFileExtension('file.Mp3')).toBe('MP3');
     });
 
-    it('should handle files without extensions (returns filename as extension)', () => {
-      // Files without dots get the whole name as "extension"
+    it('should handle files without extensions (returns empty string)', () => {
+      // Files without dots return empty string
       expect(getFileExtension('file.')).toBe('');
-      // Single-word filenames are treated as having that word as the extension
-      expect(getFileExtension('noextension')).toBe('NOEXTENSION');
+      // Single-word filenames without dots return empty string
+      expect(getFileExtension('noextension')).toBe('');
     });
 
     it('should extract last extension from multi-dot filenames', () => {
@@ -143,8 +143,8 @@ describe('File Validation Utilities', () => {
 
     it('should handle hidden files', () => {
       expect(getFileExtension('.hidden.wav')).toBe('WAV');
-      // Hidden files without extension: split('.hidden') -> ['', 'hidden'] -> pop() -> 'hidden'
-      expect(getFileExtension('.hidden')).toBe('HIDDEN');
+      // Hidden files without extension return empty string (no actual file extension)
+      expect(getFileExtension('.hidden')).toBe('');
     });
 
     it('should handle empty string filenames', () => {
@@ -202,8 +202,8 @@ describe('File Validation Utilities', () => {
     it('should format files without extensions', () => {
       // file. has empty extension
       expect(formatRejectedFileType('file.')).toBe('Unknown');
-      // noextension gets treated as having "NOEXTENSION" as the extension
-      expect(formatRejectedFileType('noextension')).toBe('Unknown (Maybe NOEXTENSION)');
+      // noextension has no extension (single word, no dots)
+      expect(formatRejectedFileType('noextension')).toBe('Unknown');
     });
 
     it('should handle mixed case extensions', () => {
@@ -218,8 +218,8 @@ describe('File Validation Utilities', () => {
 
     it('should handle hidden files', () => {
       expect(formatRejectedFileType('.hidden.wav')).toBe('Unknown (Maybe WAV)');
-      // .hidden -> split('.hidden') -> ['', 'hidden'] -> 'hidden'
-      expect(formatRejectedFileType('.hidden')).toBe('Unknown (Maybe HIDDEN)');
+      // Hidden files without extension return 'Unknown' (no actual extension)
+      expect(formatRejectedFileType('.hidden')).toBe('Unknown');
     });
   });
 
