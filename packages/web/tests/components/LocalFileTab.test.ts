@@ -43,6 +43,7 @@ vi.mock('../../src/stores/settings', () => ({
 
 vi.mock('../../src/stores/tabs', () => ({
   currentTab: {
+    subscribe: vi.fn(cb => { cb('local'); return () => {} }),
     setTab: vi.fn()
   }
 }));
