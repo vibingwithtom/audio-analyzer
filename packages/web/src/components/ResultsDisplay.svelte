@@ -56,10 +56,18 @@
 
   // Helper function to get experimental metric status
   function getExperimentalStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
-    // For files that weren't analyzed (rejected/failed), preserve their original status
-    // These files have no experimental metrics, so we can't compute a quality-based status
-    if (result.status === 'fail' || result.status === 'error') {
-      return result.status;
+    // Check if validation failed (file type, sample rate, bit depth, channels)
+    // These are instant failures that mean no analysis was performed
+    if (result.validation?.fileType?.status === 'fail' ||
+        result.validation?.sampleRate?.status === 'fail' ||
+        result.validation?.bitDepth?.status === 'fail' ||
+        result.validation?.channels?.status === 'fail') {
+      return 'fail'; // Validation failure - instant fail
+    }
+
+    // For error status (file read failures, etc), preserve it
+    if (result.status === 'error') {
+      return 'error';
     }
 
     const statuses: string[] = [];
