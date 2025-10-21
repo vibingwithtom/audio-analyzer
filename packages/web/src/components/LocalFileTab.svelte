@@ -361,11 +361,9 @@
           const fileProcessTime = fileEndTime - fileStartTime;
           const gapSinceLastFile = fileStartTime - lastFileTime;
 
-          // Store File reference for lazy blob URL creation ONLY if audio playback is shown
-          // In experimental mode, no audio player is displayed, so don't keep 6GB of files in memory!
-          if ($analysisMode !== 'experimental') {
-            (result as any).file = file;
-          }
+          // Create blob URL immediately for audio playback
+          // Store URL instead of File reference to avoid keeping large files in memory
+          result.audioUrl = URL.createObjectURL(file);
 
           // Add result immediately for smooth UI updates
           batchResults = [...batchResults, result];
