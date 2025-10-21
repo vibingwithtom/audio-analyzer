@@ -7,13 +7,13 @@ export default defineConfig({
     svelte({
       hot: !process.env.VITEST,
       compilerOptions: {
-        generate: 'dom',
-        hydratable: false,
-        immutable: true,
-        dev: false
+        dev: true
       }
     })
   ],
+  ssr: {
+    noExternal: ['svelte']
+  },
   test: {
     globals: true,
     environment: 'jsdom',
