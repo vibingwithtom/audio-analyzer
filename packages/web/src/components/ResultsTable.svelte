@@ -716,12 +716,8 @@
               </td>
               <!-- Sample Rate column -->
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.validation?.sampleRate?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.sampleRate !== undefined}
-                  <span style="color: {result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                {#if result.sampleRate !== undefined}
+                  <span style="color: {result.validation?.sampleRate?.status === 'fail' ? '#ef4444' : result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatSampleRate(result.sampleRate)}
                   </span>
                 {:else}
@@ -730,12 +726,8 @@
               </td>
               <!-- Bit Depth column -->
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.validation?.bitDepth?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.bitDepth !== undefined}
-                  <span style="color: {result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                {#if result.bitDepth !== undefined}
+                  <span style="color: {result.validation?.bitDepth?.status === 'fail' ? '#ef4444' : result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatBitDepth(result.bitDepth)}
                   </span>
                 {:else}
@@ -744,12 +736,8 @@
               </td>
               <!-- Channels column -->
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.validation?.channels?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.channels !== undefined}
-                  <span style="color: {result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                {#if result.channels !== undefined}
+                  <span style="color: {result.validation?.channels?.status === 'fail' ? '#ef4444' : result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatChannels(result.channels)}
                   </span>
                 {:else}
@@ -758,10 +746,8 @@
               </td>
               <!-- Duration column -->
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.duration !== undefined}
-                  <span style="color: {result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                {#if result.duration !== undefined}
+                  <span style="color: {result.validation?.duration?.status === 'fail' ? '#ef4444' : result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatDuration(result.duration)}
                   </span>
                 {:else}
