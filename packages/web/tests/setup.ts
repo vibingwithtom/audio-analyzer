@@ -5,28 +5,63 @@ import { afterEach, vi, beforeAll } from 'vitest';
 // Fix document.createElement returning plain objects in CI
 // Something (Svelte plugin?) breaks createElement AFTER setup runs
 // We need to ALWAYS wrap it to protect against this
-const originalCreateElement = document.createElement;
-const testDiv = originalCreateElement.call(document, 'div');
 
-console.log('[SETUP] Initial createElement working:', !!testDiv.appendChild);
-console.log('[SETUP] Initial div constructor:', testDiv.constructor.name);
+// Capture working DOM methods BEFORE anything can break them
+const originalCreateElement = document.createElement;
+const workingDiv = originalCreateElement.call(document, 'div');
+const workingMethods = {
+  appendChild: workingDiv.appendChild?.bind(workingDiv),
+  removeChild: workingDiv.removeChild?.bind(workingDiv),
+  insertBefore: workingDiv.insertBefore?.bind(workingDiv),
+  replaceChild: workingDiv.replaceChild?.bind(workingDiv),
+  cloneNode: workingDiv.cloneNode?.bind(workingDiv),
+  contains: workingDiv.contains?.bind(workingDiv)
+};
+
+console.log('[SETUP] Initial createElement working:', !!workingDiv.appendChild);
+console.log('[SETUP] Initial div constructor:', workingDiv.constructor.name);
+console.log('[SETUP] Captured methods:', Object.keys(workingMethods).filter(k => workingMethods[k]));
 
 // ALWAYS wrap createElement to protect against later breakage
 // @ts-ignore - Override createElement to ensure all elements work
 document.createElement = function(tagName: string, options?: any) {
   const element = originalCreateElement.call(document, tagName, options);
 
-  // If element lacks appendChild, manually add DOM methods from body
-  if (!element.appendChild && document.body.appendChild) {
+  // If element lacks appendChild, manually add DOM methods from captured working versions
+  if (!element.appendChild) {
     console.log('[CREATEELEMENT] Fixing broken element:', tagName);
 
-    // Prototype copying doesn't work, so manually add each required method
-    element.appendChild = document.body.appendChild.bind(element);
-    element.removeChild = document.body.removeChild.bind(element);
-    element.insertBefore = document.body.insertBefore.bind(element);
-    element.replaceChild = document.body.replaceChild?.bind(element);
-    element.cloneNode = document.body.cloneNode.bind(element);
-    element.contains = document.body.contains.bind(element);
+    // Use the working methods we captured at setup time, binding to this element
+    if (workingMethods.appendChild) {
+      element.appendChild = function(node) {
+        return workingMethods.appendChild.call(element, node);
+      };
+    }
+    if (workingMethods.removeChild) {
+      element.removeChild = function(node) {
+        return workingMethods.removeChild.call(element, node);
+      };
+    }
+    if (workingMethods.insertBefore) {
+      element.insertBefore = function(node, ref) {
+        return workingMethods.insertBefore.call(element, node, ref);
+      };
+    }
+    if (workingMethods.replaceChild) {
+      element.replaceChild = function(newNode, oldNode) {
+        return workingMethods.replaceChild.call(element, newNode, oldNode);
+      };
+    }
+    if (workingMethods.cloneNode) {
+      element.cloneNode = function(deep) {
+        return workingMethods.cloneNode.call(element, deep);
+      };
+    }
+    if (workingMethods.contains) {
+      element.contains = function(node) {
+        return workingMethods.contains.call(element, node);
+      };
+    }
 
     // Add missing properties
     if (!element.childNodes) element.childNodes = [];
