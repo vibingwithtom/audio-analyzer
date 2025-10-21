@@ -83,53 +83,80 @@ vi.mock('../../src/validation/filename-validator', () => ({
 }));
 
 describe('LocalFileTab.svelte', () => {
+  let container: HTMLElement;
+  let component: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock URL.createObjectURL
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
+
+    container = document.createElement('div');
+    document.body.appendChild(container);
   });
 
   afterEach(() => {
+    if (component && component.$destroy) {
+      component.$destroy();
+    }
+    component = null;
+
+    if (container && container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
+
     vi.clearAllMocks();
   });
 
   describe('Component Rendering', () => {
     it('should render the LocalFileTab component', () => {
-      render(LocalFileTab);
-      // Component renders to document, not container
-      expect(document.querySelector('.local-file-tab')).toBeTruthy();
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      // Component renders to container
+      expect(container.querySelector('.local-file-tab')).toBeTruthy();
     });
 
     it('should show current preset when configured', () => {
-      render(LocalFileTab);
-      const currentPreset = document.querySelector('.current-preset');
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      const currentPreset = container.querySelector('.current-preset');
       expect(currentPreset).toBeTruthy();
     });
 
     it('should render FileUpload component', () => {
-      render(LocalFileTab);
-      const fileUpload = document.querySelector('#local-file-upload');
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      const fileUpload = container.querySelector('#local-file-upload');
       expect(fileUpload).toBeTruthy();
     });
 
     it('should render analysis mode section for non-auditions presets', () => {
-      render(LocalFileTab);
-      const analysisModeSection = document.querySelector('.analysis-mode-section');
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      const analysisModeSection = container.querySelector('.analysis-mode-section');
       // Note: This may or may not render depending on preset config
       // Adjust based on actual component behavior
     });
 
     it('should disable file upload when no preset configured', () => {
-      render(LocalFileTab);
-      const fileUpload = document.querySelector('#local-file-upload') as HTMLInputElement;
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      const fileUpload = container.querySelector('#local-file-upload') as HTMLInputElement;
       expect(fileUpload).toBeTruthy();
       // Note: The disabled state depends on store values
     });
 
     it('should show warning when no valid preset configured', () => {
-      render(LocalFileTab);
-      const warning = document.querySelector('.no-preset-warning');
+      component = new (LocalFileTab as any)({
+        target: container
+      });
+      const warning = container.querySelector('.no-preset-warning');
       // Warning visibility depends on store values
     });
   });

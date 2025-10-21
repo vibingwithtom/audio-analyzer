@@ -26,30 +26,63 @@ vi.mock('../../src/utils/status-utils', () => ({
 }));
 
 vi.mock('../../src/stores/settings', () => ({
-  selectedPreset: { subscribe: vi.fn(cb => { cb('auditions'); return () => {} }) }
+  selectedPreset: { subscribe: vi.fn(cb => { cb({ maxOverlapWarning: 0.3, maxOverlapFail: 0.5, maxOverlapSegmentWarning: 5, maxOverlapSegmentFail: 10 }); return () => {} }) }
+}));
+
+vi.mock('@audio-analyzer/core', () => ({
+  CriteriaValidator: {
+    validateSpeechOverlap: vi.fn(() => ({ status: 'pass' })),
+    validateStereoType: vi.fn(() => ({ status: 'pass' }))
+  }
 }));
 
 describe('ResultsTable', () => {
+  let container: HTMLElement;
+  let component: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
+
+    // Create container for component
+    container = document.createElement('div');
+    document.body.appendChild(container);
   });
 
   afterEach(() => {
+    // Cleanup component
+    if (component && component.$destroy) {
+      component.$destroy();
+    }
+    component = null;
+
+    // Remove container
+    if (container && container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
+
     vi.clearAllMocks();
   });
 
   describe('Component Rendering', () => {
     it('should render the results table component', () => {
       const results = createMockAnalysisResults(1);
-      render(ResultsTable, { props: { results } });
 
-      expect(document.querySelector('table')).toBeTruthy();
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
+
+      const table = document.querySelector('table');
+      expect(table).toBeTruthy();
     });
 
     it('should render empty state when no results', () => {
-      render(ResultsTable, { props: { results: [] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [] }
+      });
 
       const table = document.querySelector('table');
       expect(table).toBeTruthy();
@@ -66,7 +99,8 @@ describe('ResultsTable', () => {
         duration: 120
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           mode: 'single'
@@ -79,7 +113,8 @@ describe('ResultsTable', () => {
 
     it('should show audio player for single file', () => {
       const result = createMockAnalysisResult({ filename: 'test.wav' });
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           mode: 'single'
@@ -97,7 +132,8 @@ describe('ResultsTable', () => {
         duration: 120
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           mode: 'single'
@@ -116,7 +152,8 @@ describe('ResultsTable', () => {
         createMockAnalysisResult({ filename: 'test2.wav' })
       ];
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results,
           mode: 'batch'
@@ -134,7 +171,8 @@ describe('ResultsTable', () => {
         createMockAnalysisResult({ status: 'fail' })
       ];
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results,
           mode: 'batch'
@@ -147,7 +185,8 @@ describe('ResultsTable', () => {
 
     it('should handle large batches', () => {
       const results = createMockAnalysisResults(50);
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results,
           mode: 'batch'
@@ -162,21 +201,30 @@ describe('ResultsTable', () => {
   describe('Status Display', () => {
     it('should display pass status', () => {
       const result = createMockAnalysisResult({ status: 'pass' });
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should display fail status', () => {
       const result = createMockAnalysisResult({ status: 'fail' });
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should display warning status', () => {
       const result = createMockAnalysisResult({ status: 'warning' });
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
@@ -187,7 +235,10 @@ describe('ResultsTable', () => {
         error: 'File read failed'
       });
 
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       const table = document.querySelector('table');
       expect(table?.textContent).toContain('File');
@@ -201,7 +252,8 @@ describe('ResultsTable', () => {
         noiseFloor: { db: -60, status: 'pass' as const }
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           metadataOnly: true
@@ -216,7 +268,8 @@ describe('ResultsTable', () => {
         peakDb: -6
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           metadataOnly: false
@@ -231,10 +284,11 @@ describe('ResultsTable', () => {
     it('should display experimental metrics when enabled', () => {
       const result = createMockAnalysisResult({
         peakDb: -3.5,
-        reverbInfo: { rt60: 0.8, status: 'pass' as const }
+        reverbInfo: { time: 0.8, label: 'Moderate', status: 'pass' as const }
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           experimentalMode: true
@@ -249,7 +303,8 @@ describe('ResultsTable', () => {
         peakDb: -3.5
       });
 
-      render(ResultsTable, {
+      component = new (ResultsTable as any)({
+        target: container,
         props: {
           results: [result],
           experimentalMode: false
@@ -273,7 +328,10 @@ describe('ResultsTable', () => {
         }
       });
 
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       const table = document.querySelector('table');
       expect(table?.textContent).toContain('Sample');
@@ -282,6 +340,7 @@ describe('ResultsTable', () => {
     it('should show validation warnings', () => {
       const result = createMockAnalysisResult({
         status: 'warning',
+        channels: 1, // Set channels to 1 so formatChannels returns 'Mono'
         validation: {
           channels: {
             status: 'warning',
@@ -291,7 +350,10 @@ describe('ResultsTable', () => {
         }
       });
 
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       const table = document.querySelector('table');
       expect(table?.textContent).toContain('Mono');
@@ -301,14 +363,20 @@ describe('ResultsTable', () => {
   describe('Scrolling', () => {
     it('should handle horizontal scroll detection', () => {
       const results = createMockAnalysisResults(5);
-      render(ResultsTable, { props: { results, mode: 'batch' } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results, mode: 'batch' }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should handle scroll on resize', () => {
       const results = createMockAnalysisResults(3);
-      render(ResultsTable, { props: { results } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
 
       // Simulate window resize
       window.dispatchEvent(new Event('resize'));
@@ -320,14 +388,20 @@ describe('ResultsTable', () => {
   describe('Fullscreen', () => {
     it('should handle fullscreen toggle', () => {
       const results = createMockAnalysisResults(1);
-      render(ResultsTable, { props: { results } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should exit fullscreen on ESC key', () => {
       const results = createMockAnalysisResults(1);
-      render(ResultsTable, { props: { results } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
 
       const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
       document.dispatchEvent(escEvent);
@@ -339,17 +413,22 @@ describe('ResultsTable', () => {
   describe('Audio Playback', () => {
     it('should create blob URLs for playback', () => {
       const result = createMockAnalysisResult();
-      render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should revoke blob URLs on cleanup', () => {
       const result = createMockAnalysisResult();
-      const { unmount } = render(ResultsTable, { props: { results: [result] } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: [result] }
+      });
 
-      unmount();
-
+      // Cleanup happens in afterEach
       expect(global.URL.revokeObjectURL).toBeDefined();
     });
   });
@@ -357,28 +436,52 @@ describe('ResultsTable', () => {
   describe('Props Updates', () => {
     it('should update when results change', () => {
       const initial = createMockAnalysisResults(1);
-      const { rerender } = render(ResultsTable, { props: { results: initial } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: initial }
+      });
 
+      // Destroy and recreate with updated props
+      if (component.$destroy) component.$destroy();
       const updated = createMockAnalysisResults(3);
-      rerender({ props: { results: updated } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results: updated }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should update when mode changes', () => {
       const results = createMockAnalysisResults(2);
-      const { rerender } = render(ResultsTable, { props: { results, mode: 'single' } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results, mode: 'single' }
+      });
 
-      rerender({ props: { results, mode: 'batch' } });
+      // Destroy and recreate with updated mode
+      if (component.$destroy) component.$destroy();
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results, mode: 'batch' }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
 
     it('should update when experimentalMode changes', () => {
       const results = createMockAnalysisResults(1);
-      const { rerender } = render(ResultsTable, { props: { results, experimentalMode: false } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results, experimentalMode: false }
+      });
 
-      rerender({ props: { results, experimentalMode: true } });
+      // Destroy and recreate with updated experimentalMode
+      if (component.$destroy) component.$destroy();
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results, experimentalMode: true }
+      });
 
       expect(document.querySelector('table')).toBeTruthy();
     });
@@ -387,7 +490,10 @@ describe('ResultsTable', () => {
   describe('Accessibility', () => {
     it('should have table headers', () => {
       const results = createMockAnalysisResults(1);
-      render(ResultsTable, { props: { results } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
 
       const headers = document.querySelectorAll('th');
       expect(headers.length).toBeGreaterThan(0);
@@ -395,7 +501,10 @@ describe('ResultsTable', () => {
 
     it('should use semantic structure', () => {
       const results = createMockAnalysisResults(1);
-      render(ResultsTable, { props: { results } });
+      component = new (ResultsTable as any)({
+        target: container,
+        props: { results }
+      });
 
       expect(document.querySelector('thead')).toBeTruthy();
       expect(document.querySelector('tbody')).toBeTruthy();
