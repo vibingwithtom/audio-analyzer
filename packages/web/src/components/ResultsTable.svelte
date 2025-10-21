@@ -4,6 +4,15 @@
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
+  import {
+    computeExperimentalStatus,
+    getNormalizationStatus,
+    getReverbStatus,
+    getNoiseFloorStatus,
+    getSilenceStatus,
+    getClippingStatus,
+    getMicBleedStatus
+  } from '../utils/status-utils';
 
   import { onMount, onDestroy } from 'svelte';
 
@@ -131,16 +140,11 @@
 
   // Helper functions for experimental metrics color-coding
   function getNormalizationClass(status: any): string {
-    if (!status) return '';
-    if (status.status === 'normalized') return 'success';
-    return 'warning';
+    return getNormalizationStatus(status);
   }
 
   function getReverbClass(label: string): string {
-    if (!label) return '';
-    if (label.includes('Excellent') || label.includes('Good')) return 'success';
-    if (label.includes('Fair')) return 'warning';
-    return 'error';
+    return getReverbStatus(label);
   }
 
   function getMicBleedClass(micBleed: any): string {
@@ -159,19 +163,7 @@
 
   // Unified mic bleed detection using OR logic (either method detects = possible bleed)
   function getUnifiedMicBleedClass(micBleed: any): string {
-    if (!micBleed) return '';
-
-    // Check OLD method: > -60 dB means detected
-    const oldDetected = micBleed.old &&
-      (micBleed.old.leftChannelBleedDb > -60 || micBleed.old.rightChannelBleedDb > -60);
-
-    // Check NEW method: > 0.5% confirmed bleed means detected
-    const newDetected = micBleed.new &&
-      (micBleed.new.percentageConfirmedBleed > 0.5);
-
-    // OR logic: if either detects, show warning
-    if (oldDetected || newDetected) return 'warning';
-    return 'success';
+    return getMicBleedStatus(micBleed);
   }
 
   function getUnifiedMicBleedLabel(micBleed: any): string {
@@ -191,29 +183,11 @@
   }
 
   function getNoiseFloorClass(noiseFloorDb: number | undefined): string {
-    if (noiseFloorDb === undefined || noiseFloorDb === -Infinity) return '';
-    // Excellent/Good: <= -60 dB
-    if (noiseFloorDb <= -60) return 'success';
-    // Fair: -60 to -50 dB
-    if (noiseFloorDb <= -50) return 'warning';
-    // Poor: > -50 dB
-    return 'error';
+    return getNoiseFloorStatus(noiseFloorDb);
   }
 
   function getSilenceClass(seconds: number | undefined, type: 'lead-trail' | 'max'): string {
-    if (seconds === undefined || seconds === null) return '';
-
-    if (type === 'lead-trail') {
-      // Leading/Trailing silence thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    } else {
-      // Max silence gap thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    }
+    return getSilenceStatus(seconds, type);
   }
 
   function formatTime(seconds: number | undefined): string {
@@ -300,20 +274,18 @@
   }
 
   function getClippingClass(clippingAnalysis: any): string {
-    return getClippingSeverity(clippingAnalysis).level;
+    return getClippingStatus(clippingAnalysis);
   }
 
   // Helper to determine worst status across all experimental metrics for row background color
   function getExperimentalRowStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
-    // Check if validation failed (file type, sample rate, bit depth, channels)
-    if (result.validation?.fileType?.status === 'fail' ||
-        result.validation?.sampleRate?.status === 'fail' ||
-        result.validation?.bitDepth?.status === 'fail' ||
-        result.validation?.channels?.status === 'fail') {
-      return 'fail'; // Validation failure - instant fail
+    // Use the shared status computation, then map error to fail for table row styling
+    const sharedStatus = computeExperimentalStatus(result);
+    if (sharedStatus === 'error') {
+      return 'fail'; // Map error to fail for table row display
     }
 
-    let worstStatus: 'pass' | 'warning' | 'fail' = 'pass';
+    let worstStatus: 'pass' | 'warning' | 'fail' = sharedStatus as 'pass' | 'warning' | 'fail';
 
     // Helper to update worst status
     const updateWorst = (status: string) => {
@@ -324,48 +296,8 @@
       }
     };
 
-    // Check basic property validations (if they exist)
-    if (result.validation?.sampleRate?.status) {
-      updateWorst(result.validation.sampleRate.status);
-    }
-    if (result.validation?.bitDepth?.status) {
-      updateWorst(result.validation.bitDepth.status);
-    }
-    if (result.validation?.channels?.status) {
-      updateWorst(result.validation.channels.status);
-    }
-
-    // Check normalization
-    const normClass = getNormalizationClass(result.normalizationStatus);
-    updateWorst(normClass);
-
-    // Check clipping
-    const clippingClass = getClippingClass(result.clippingAnalysis);
-    updateWorst(clippingClass);
-
-    // Check noise floor
-    const noiseClass = getNoiseFloorClass(result.noiseFloorDb);
-    updateWorst(noiseClass);
-
-    // Check reverb
-    if (result.reverbInfo) {
-      const reverbClass = getReverbClass(result.reverbInfo.label);
-      updateWorst(reverbClass);
-    }
-
-    // Check silence (leading, trailing, max)
-    if (result.leadingSilence !== undefined) {
-      const leadClass = getSilenceClass(result.leadingSilence, 'lead-trail');
-      updateWorst(leadClass);
-    }
-    if (result.trailingSilence !== undefined) {
-      const trailClass = getSilenceClass(result.trailingSilence, 'lead-trail');
-      updateWorst(trailClass);
-    }
-    if (result.longestSilence !== undefined) {
-      const maxClass = getSilenceClass(result.longestSilence, 'max');
-      updateWorst(maxClass);
-    }
+    // Check preset-aware validations (these require $selectedPreset)
+    // These are not included in the shared computeExperimentalStatus
 
     // Check stereo type
     const stereoClass = getStereoTypeClass(result);
@@ -374,12 +306,6 @@
     // Check speech overlap
     const overlapClass = getOverlapClass(result);
     updateWorst(overlapClass);
-
-    // Check mic bleed
-    if (result.micBleed) {
-      const micBleedClass = getUnifiedMicBleedClass(result.micBleed);
-      updateWorst(micBleedClass);
-    }
 
     return worstStatus;
   }
