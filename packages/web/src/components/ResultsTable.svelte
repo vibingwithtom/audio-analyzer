@@ -660,6 +660,12 @@
         <thead>
           <tr>
             <th>Filename</th>
+            <th>Status</th>
+            <th>File Type</th>
+            <th>Sample Rate</th>
+            <th>Bit Depth</th>
+            <th>Channels</th>
+            <th>Duration</th>
             <th>Peak Level</th>
             <th>Normalization</th>
             <th>Clipping</th>
@@ -680,6 +686,60 @@
                   <span style="color: #ef4444; font-weight: 500;">{result.filename}</span>
                 {:else}
                   {result.filename}
+                {/if}
+              </td>
+              <!-- Status column -->
+              <td>
+                <StatusBadge status={rowStatus} />
+              </td>
+              <!-- File Type column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.fileType}
+                  {result.fileType}
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Sample Rate column -->
+              <td>
+                {#if result.validation?.sampleRate?.status === 'fail'}
+                  --
+                {:else if result.sampleRate !== undefined}
+                  {formatSampleRate(result.sampleRate)}
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Bit Depth column -->
+              <td>
+                {#if result.validation?.bitDepth?.status === 'fail'}
+                  --
+                {:else if result.bitDepth !== undefined}
+                  {formatBitDepth(result.bitDepth)}
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Channels column -->
+              <td>
+                {#if result.validation?.channels?.status === 'fail'}
+                  --
+                {:else if result.channels !== undefined}
+                  {formatChannels(result.channels)}
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Duration column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.duration !== undefined}
+                  {formatDuration(result.duration)}
+                {:else}
+                  N/A
                 {/if}
               </td>
               <td>
