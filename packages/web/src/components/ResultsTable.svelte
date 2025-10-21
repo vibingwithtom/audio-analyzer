@@ -518,7 +518,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     line-height: 1;
-    z-index: 20;
+    z-index: 100;
     position: relative;
   }
 
