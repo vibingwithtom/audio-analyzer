@@ -518,6 +518,8 @@
     cursor: pointer;
     transition: all 0.2s ease;
     line-height: 1;
+    z-index: 20;
+    position: relative;
   }
 
   .expand-button:hover {
