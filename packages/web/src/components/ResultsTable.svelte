@@ -4,6 +4,15 @@
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
+  import {
+    computeExperimentalStatus,
+    getNormalizationStatus,
+    getReverbStatus,
+    getNoiseFloorStatus,
+    getSilenceStatus,
+    getClippingStatus,
+    getMicBleedStatus
+  } from '../utils/status-utils';
 
   import { onMount, onDestroy } from 'svelte';
 
@@ -131,16 +140,11 @@
 
   // Helper functions for experimental metrics color-coding
   function getNormalizationClass(status: any): string {
-    if (!status) return '';
-    if (status.status === 'normalized') return 'success';
-    return 'warning';
+    return getNormalizationStatus(status);
   }
 
   function getReverbClass(label: string): string {
-    if (!label) return '';
-    if (label.includes('Excellent') || label.includes('Good')) return 'success';
-    if (label.includes('Fair')) return 'warning';
-    return 'error';
+    return getReverbStatus(label);
   }
 
   function getMicBleedClass(micBleed: any): string {
@@ -159,19 +163,7 @@
 
   // Unified mic bleed detection using OR logic (either method detects = possible bleed)
   function getUnifiedMicBleedClass(micBleed: any): string {
-    if (!micBleed) return '';
-
-    // Check OLD method: > -60 dB means detected
-    const oldDetected = micBleed.old &&
-      (micBleed.old.leftChannelBleedDb > -60 || micBleed.old.rightChannelBleedDb > -60);
-
-    // Check NEW method: > 0.5% confirmed bleed means detected
-    const newDetected = micBleed.new &&
-      (micBleed.new.percentageConfirmedBleed > 0.5);
-
-    // OR logic: if either detects, show warning
-    if (oldDetected || newDetected) return 'warning';
-    return 'success';
+    return getMicBleedStatus(micBleed);
   }
 
   function getUnifiedMicBleedLabel(micBleed: any): string {
@@ -191,29 +183,11 @@
   }
 
   function getNoiseFloorClass(noiseFloorDb: number | undefined): string {
-    if (noiseFloorDb === undefined || noiseFloorDb === -Infinity) return '';
-    // Excellent/Good: <= -60 dB
-    if (noiseFloorDb <= -60) return 'success';
-    // Fair: -60 to -50 dB
-    if (noiseFloorDb <= -50) return 'warning';
-    // Poor: > -50 dB
-    return 'error';
+    return getNoiseFloorStatus(noiseFloorDb);
   }
 
   function getSilenceClass(seconds: number | undefined, type: 'lead-trail' | 'max'): string {
-    if (seconds === undefined || seconds === null) return '';
-
-    if (type === 'lead-trail') {
-      // Leading/Trailing silence thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    } else {
-      // Max silence gap thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    }
+    return getSilenceStatus(seconds, type);
   }
 
   function formatTime(seconds: number | undefined): string {
@@ -300,12 +274,18 @@
   }
 
   function getClippingClass(clippingAnalysis: any): string {
-    return getClippingSeverity(clippingAnalysis).level;
+    return getClippingStatus(clippingAnalysis);
   }
 
   // Helper to determine worst status across all experimental metrics for row background color
   function getExperimentalRowStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
-    let worstStatus: 'pass' | 'warning' | 'fail' = 'pass';
+    // Use the shared status computation, then map error to fail for table row styling
+    const sharedStatus = computeExperimentalStatus(result);
+    if (sharedStatus === 'error') {
+      return 'fail'; // Map error to fail for table row display
+    }
+
+    let worstStatus: 'pass' | 'warning' | 'fail' = sharedStatus as 'pass' | 'warning' | 'fail';
 
     // Helper to update worst status
     const updateWorst = (status: string) => {
@@ -316,42 +296,8 @@
       }
     };
 
-    // Check validation status (preset criteria)
-    if (result.status && result.status !== 'pass') {
-      updateWorst(result.status);
-    }
-
-    // Check normalization
-    const normClass = getNormalizationClass(result.normalizationStatus);
-    updateWorst(normClass);
-
-    // Check clipping
-    const clippingClass = getClippingClass(result.clippingAnalysis);
-    updateWorst(clippingClass);
-
-    // Check noise floor
-    const noiseClass = getNoiseFloorClass(result.noiseFloorDb);
-    updateWorst(noiseClass);
-
-    // Check reverb
-    if (result.reverbInfo) {
-      const reverbClass = getReverbClass(result.reverbInfo.label);
-      updateWorst(reverbClass);
-    }
-
-    // Check silence (leading, trailing, max)
-    if (result.leadingSilence !== undefined) {
-      const leadClass = getSilenceClass(result.leadingSilence, 'lead-trail');
-      updateWorst(leadClass);
-    }
-    if (result.trailingSilence !== undefined) {
-      const trailClass = getSilenceClass(result.trailingSilence, 'lead-trail');
-      updateWorst(trailClass);
-    }
-    if (result.longestSilence !== undefined) {
-      const maxClass = getSilenceClass(result.longestSilence, 'max');
-      updateWorst(maxClass);
-    }
+    // Check preset-aware validations (these require $selectedPreset)
+    // These are not included in the shared computeExperimentalStatus
 
     // Check stereo type
     const stereoClass = getStereoTypeClass(result);
@@ -360,12 +306,6 @@
     // Check speech overlap
     const overlapClass = getOverlapClass(result);
     updateWorst(overlapClass);
-
-    // Check mic bleed
-    if (result.micBleed) {
-      const micBleedClass = getUnifiedMicBleedClass(result.micBleed);
-      updateWorst(micBleedClass);
-    }
 
     return worstStatus;
   }
@@ -660,6 +600,12 @@
         <thead>
           <tr>
             <th>Filename</th>
+            <th>Status</th>
+            <th>File Type</th>
+            <th>Sample Rate</th>
+            <th>Bit Depth</th>
+            <th>Channels</th>
+            <th>Duration</th>
             <th>Peak Level</th>
             <th>Normalization</th>
             <th>Clipping</th>
@@ -676,23 +622,79 @@
             {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444; font-weight: 500;">{result.filename}</span>
-                {:else}
-                  {result.filename}
-                {/if}
+                {result.filename}
               </td>
+              <!-- Status column -->
               <td>
-                {#if result.peakDb !== undefined}
-                  {result.peakDb.toFixed(1)} dB
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
+                <StatusBadge status={rowStatus} />
+              </td>
+              <!-- File Type column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.fileType}
+                  <span style="color: {result.validation?.fileType?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {result.fileType}
+                  </span>
                 {:else}
                   N/A
                 {/if}
               </td>
+              <!-- Sample Rate column -->
               <td>
-                {#if result.normalizationStatus}
+                {#if result.sampleRate !== undefined}
+                  <span style="color: {result.validation?.sampleRate?.status === 'fail' ? '#ef4444' : result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatSampleRate(result.sampleRate)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Bit Depth column -->
+              <td>
+                {#if result.bitDepth !== undefined}
+                  <span style="color: {result.validation?.bitDepth?.status === 'fail' ? '#ef4444' : result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatBitDepth(result.bitDepth)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Channels column -->
+              <td>
+                {#if result.channels !== undefined}
+                  <span style="color: {result.validation?.channels?.status === 'fail' ? '#ef4444' : result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatChannels(result.channels)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Duration column -->
+              <td>
+                {#if result.duration !== undefined}
+                  <span style="color: {result.validation?.duration?.status === 'fail' ? '#ef4444' : result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatDuration(result.duration)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Peak Level -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.peakDb !== undefined}
+                  {result.peakDb.toFixed(1)} dB
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Normalization -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.normalizationStatus}
                   <span class="value-{getNormalizationClass(result.normalizationStatus)}">
                     {result.normalizationStatus.message || 'N/A'}
                   </span>
@@ -706,8 +708,6 @@
                       <span class="subtitle">{distance.toFixed(1)} dB under target</span>
                     {/if}
                   {/if}
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -764,10 +764,10 @@
                   {#if severity.eventCount > 0}
                     <span class="subtitle">{severity.eventCount} event{severity.eventCount > 1 ? 's' : ''}</span>
                   {/if}
+                {:else if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.peakDb !== undefined}
                   <span class="value-success">Not detected</span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -796,7 +796,9 @@
                   return tooltip;
                 })() : 'Noise floor analysis data not available'}
               >
-                {#if result.noiseFloorDb !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.noiseFloorDb !== undefined}
                   <span class="value-{getNoiseFloorClass(result.noiseFloorDb)}">
                     {result.noiseFloorDb === -Infinity ? '-∞' : result.noiseFloorDb.toFixed(1)} dB
                   </span>
@@ -820,8 +822,6 @@
                       {/if}
                     </span>
                   {/if}
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -845,13 +845,13 @@
                   return tooltip;
                 })() : 'Reverb analysis data not available'}
               >
-                {#if result.reverbInfo}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.reverbInfo}
                   <span class="value-{getReverbClass(result.reverbInfo.label)}">
                     ~{result.reverbInfo.time.toFixed(2)} s
                   </span>
                   <span class="subtitle">{result.reverbInfo.label}</span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -879,20 +879,22 @@
                   return tooltip;
                 })()}
               >
-                {#if result.leadingSilence !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.leadingSilence !== undefined}
                   <div>
                     <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
                     <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
                     <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
                   </div>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
               </td>
               <td>
-                {#if result.stereoSeparation}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.stereoSeparation}
                   <span class="value-{getStereoTypeClass(result)}">
                     {result.stereoSeparation.stereoType}
                   </span>
@@ -901,8 +903,6 @@
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
                   </span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -936,7 +936,9 @@
                   return tooltip;
                 })() : 'Speech overlap analysis only runs for Conversational Stereo files'}
               >
-                {#if result.conversationalAnalysis?.overlap}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.conversationalAnalysis?.overlap}
                   {@const longestDuration = getLongestOverlapDuration(result)}
                   <div>
                     <span class="subtitle">%: <span class="value-{getOverlapPercentageClass(result)}">{result.conversationalAnalysis.overlap.overlapPercentage.toFixed(1)}%</span></span>
@@ -944,8 +946,6 @@
                       <span class="subtitle">Max: <span class="value-{getOverlapSegmentClass(result)}">{longestDuration.toFixed(1)}s</span></span>
                     {/if}
                   </div>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -1013,12 +1013,12 @@
                   }
                 })() : 'Mic bleed analysis only runs for Conversational Stereo files'}
               >
-                {#if result.micBleed}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.micBleed}
                   <span class="value-{getUnifiedMicBleedClass(result.micBleed)}">
                     {getUnifiedMicBleedLabel(result.micBleed)}
                   </span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
