@@ -115,10 +115,11 @@
     if (tableWrapper) {
       checkScroll(); // Initial check
       const handleScroll = () => checkScroll();
-      tableWrapper.addEventListener('scroll', handleScroll);
+      const wrapper = tableWrapper; // Capture reference for cleanup
+      wrapper.addEventListener('scroll', handleScroll);
 
       return () => {
-        tableWrapper.removeEventListener('scroll', handleScroll);
+        wrapper.removeEventListener('scroll', handleScroll);
       };
     }
   });
