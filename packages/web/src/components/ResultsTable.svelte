@@ -806,6 +806,7 @@
             <th>Stereo Separation</th>
             <th>Speech Overlap</th>
             <th>Mic Bleed</th>
+            <th>Play</th>
           </tr>
         </thead>
         <tbody>
@@ -1218,6 +1219,16 @@
                   </span>
                 {:else}
                   N/A
+                {/if}
+              </td>
+              <!-- Play -->
+              <td>
+                {#if getAudioUrl(result)}
+                  <audio controls src={getAudioUrl(result)}></audio>
+                {:else if result.externalUrl}
+                  <a href={result.externalUrl} target="_blank" rel="noopener noreferrer" class="external-link-btn" title="View in Box/Google Drive">
+                    ▶
+                  </a>
                 {/if}
               </td>
             </tr>
