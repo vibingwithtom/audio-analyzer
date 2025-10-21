@@ -716,7 +716,9 @@
               </td>
               <!-- Sample Rate column -->
               <td>
-                {#if result.validation?.sampleRate?.status === 'fail'}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.validation?.sampleRate?.status === 'fail'}
                   <span style="color: #ef4444;">--</span>
                 {:else if result.sampleRate !== undefined}
                   <span style="color: {result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
@@ -728,7 +730,9 @@
               </td>
               <!-- Bit Depth column -->
               <td>
-                {#if result.validation?.bitDepth?.status === 'fail'}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.validation?.bitDepth?.status === 'fail'}
                   <span style="color: #ef4444;">--</span>
                 {:else if result.bitDepth !== undefined}
                   <span style="color: {result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
@@ -740,7 +744,9 @@
               </td>
               <!-- Channels column -->
               <td>
-                {#if result.validation?.channels?.status === 'fail'}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.validation?.channels?.status === 'fail'}
                   <span style="color: #ef4444;">--</span>
                 {:else if result.channels !== undefined}
                   <span style="color: {result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
