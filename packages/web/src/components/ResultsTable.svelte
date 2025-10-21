@@ -675,8 +675,22 @@
           {#each results as result, index (`${result.filename}-${index}`)}
             {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
-              <td>{result.filename}</td>
-              <td>{result.peakDb !== undefined ? result.peakDb.toFixed(1) + ' dB' : 'N/A'}</td>
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444; font-weight: 500;">{result.filename}</span>
+                {:else}
+                  {result.filename}
+                {/if}
+              </td>
+              <td>
+                {#if result.peakDb !== undefined}
+                  {result.peakDb.toFixed(1)} dB
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
+                {:else}
+                  N/A
+                {/if}
+              </td>
               <td>
                 {#if result.normalizationStatus}
                   <span class="value-{getNormalizationClass(result.normalizationStatus)}">
@@ -692,6 +706,8 @@
                       <span class="subtitle">{distance.toFixed(1)} dB under target</span>
                     {/if}
                   {/if}
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
@@ -750,6 +766,8 @@
                   {/if}
                 {:else if result.peakDb !== undefined}
                   <span class="value-success">Not detected</span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
@@ -802,6 +820,8 @@
                       {/if}
                     </span>
                   {/if}
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
@@ -830,6 +850,8 @@
                     ~{result.reverbInfo.time.toFixed(2)} s
                   </span>
                   <span class="subtitle">{result.reverbInfo.label}</span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
@@ -857,11 +879,15 @@
                   return tooltip;
                 })()}
               >
-                <div>
-                  <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
-                  <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
-                  <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
-                </div>
+                {#if result.status === 'fail' || result.status === 'error'}
+                  --
+                {:else}
+                  <div>
+                    <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
+                    <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
+                    <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
+                  </div>
+                {/if}
               </td>
               <td>
                 {#if result.stereoSeparation}
@@ -869,6 +895,8 @@
                     {result.stereoSeparation.stereoType}
                   </span>
                   <span class="subtitle">{Math.round(result.stereoSeparation.stereoConfidence * 100)}% conf</span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
@@ -912,6 +940,8 @@
                       <span class="subtitle">Max: <span class="value-{getOverlapSegmentClass(result)}">{longestDuration.toFixed(1)}s</span></span>
                     {/if}
                   </div>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
@@ -983,6 +1013,8 @@
                   <span class="value-{getUnifiedMicBleedClass(result.micBleed)}">
                     {getUnifiedMicBleedLabel(result.micBleed)}
                   </span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   N/A
                 {/if}
