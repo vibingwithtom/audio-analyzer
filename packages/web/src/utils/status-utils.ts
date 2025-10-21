@@ -3,12 +3,12 @@
  * Used by both ResultsDisplay and ResultsTable components
  */
 
-import type { AudioResults } from '../types';
+import type { AudioResults, ClippingAnalysis, ConversationalAnalysis } from '../types';
 
 /**
  * Classify normalization status into a validation result
  */
-export function getNormalizationStatus(status: any): 'success' | 'warning' | '' {
+export function getNormalizationStatus(status: any | undefined): 'success' | 'warning' | '' {
   if (!status) return '';
   if (status.status === 'normalized') return 'success';
   return 'warning';
@@ -62,7 +62,7 @@ export function getSilenceStatus(
 /**
  * Classify clipping analysis into a validation result
  */
-export function getClippingStatus(clippingAnalysis: any): 'success' | 'warning' | 'error' | '' {
+export function getClippingStatus(clippingAnalysis: ClippingAnalysis | undefined): 'success' | 'warning' | 'error' | '' {
   if (!clippingAnalysis) return '';
 
   const { clippedPercentage, clippingEventCount, nearClippingPercentage } = clippingAnalysis;
@@ -82,7 +82,7 @@ export function getClippingStatus(clippingAnalysis: any): 'success' | 'warning' 
 /**
  * Classify mic bleed detection (using unified OR logic)
  */
-export function getMicBleedStatus(micBleed: any): 'success' | 'warning' | '' {
+export function getMicBleedStatus(micBleed: any | undefined): 'success' | 'warning' | '' {
   if (!micBleed) return '';
 
   // Check OLD method: > -60 dB means detected
@@ -109,11 +109,11 @@ export function getMicBleedStatus(micBleed: any): 'success' | 'warning' | '' {
  *
  * Returns 'warning' if any metric has warning status
  * Returns 'pass' if all metrics are success
+ *
+ * Note: Speech overlap and stereo type validation are preset-aware and not included here.
+ * These are handled by the caller which has access to the selected preset.
  */
-export function computeExperimentalStatus(
-  result: AudioResults,
-  preset?: any // Optional preset for preset-aware validation (used in ResultsTable)
-): 'pass' | 'warning' | 'fail' | 'error' {
+export function computeExperimentalStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
   // Check if validation failed (file type, sample rate, bit depth, channels)
   // These are instant failures that mean no analysis was performed
   if (result.validation?.fileType?.status === 'fail' ||
@@ -176,16 +176,9 @@ export function computeExperimentalStatus(
     if (clippingStatus) statuses.push(clippingStatus);
   }
 
-  // Check conversational audio metrics (only for conversational stereo)
-  if (result.conversationalAnalysis) {
-    // Check speech overlap
-    if (result.conversationalAnalysis.overlap) {
-      const overlapPct = result.conversationalAnalysis.overlap.overlapPercentage;
-      if (overlapPct < 5) statuses.push('success');
-      else if (overlapPct <= 15) statuses.push('warning');
-      else statuses.push('error');
-    }
-  }
+  // Note: Speech overlap and stereo type validation are preset-aware and are not included here.
+  // These are handled by the caller (e.g., ResultsTable.getExperimentalRowStatus) which has
+  // access to the selected preset for validation-aware thresholds.
 
   // Determine worst status
   if (statuses.includes('error')) return 'fail';
