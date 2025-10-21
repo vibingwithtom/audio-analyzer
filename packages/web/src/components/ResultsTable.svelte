@@ -37,7 +37,9 @@
   let isFullscreen = $state(false);
 
   // Lazy blob URL management - create on-demand to prevent memory buildup
-  const blobUrlCache = new Map<string, string>(); // filename -> blob URL
+  // Use WeakMap keyed by result object to avoid issues with duplicate filenames
+  const blobUrlCache = new WeakMap<AudioResults, string>();
+  const createdUrls = new Set<string>(); // Track URLs for cleanup
 
   function getAudioUrl(result: AudioResults): string | null {
     // Use existing audioUrl if available
@@ -47,21 +49,22 @@
     const file = (result as any).file;
     if (!file) return null;
 
-    // Check cache first
-    if (blobUrlCache.has(result.filename)) {
-      return blobUrlCache.get(result.filename)!;
+    // Check cache first (keyed by result object, not filename)
+    if (blobUrlCache.has(result)) {
+      return blobUrlCache.get(result)!;
     }
 
     // Create blob URL and cache it
     const blobUrl = URL.createObjectURL(file);
-    blobUrlCache.set(result.filename, blobUrl);
+    blobUrlCache.set(result, blobUrl);
+    createdUrls.add(blobUrl);
     return blobUrl;
   }
 
   // Cleanup blob URLs on component destroy
   onDestroy(() => {
-    blobUrlCache.forEach(url => URL.revokeObjectURL(url));
-    blobUrlCache.clear();
+    createdUrls.forEach(url => URL.revokeObjectURL(url));
+    createdUrls.clear();
   });
 
   // Check if table has horizontal scroll and which direction
