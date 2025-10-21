@@ -97,31 +97,36 @@ export async function analyzeAudioFile(
       result = await analyzeMetadataOnly(file, filename, options);
     } else {
       // Full audio analysis
-      result = await analyzeFullFile(file, filename, mode, preset, presetId, criteria, scriptsList, speakerId, progressCallback);
+      result = await analyzeFullFile(file, filename, mode, preset, presetId, criteria, scriptsList, speakerId, progressCallback, skipIndividualTracking);
     }
 
     return result;
   } catch (error) {
     // Handle cancellation gracefully (don't track as error)
     if (error instanceof AnalysisCancelledError) {
-      analyticsService.track('analysis_cancelled', {
-        filename,
-        stage: (error as any).stage,
-        analysisMode: options.analysisMode,
-        fileSize: file.size,
-      });
+      // Only track individual cancellations if not in batch mode (to save Umami quota)
+      if (!skipIndividualTracking) {
+        analyticsService.track('analysis_cancelled', {
+          filename,
+          stage: (error as any).stage,
+          analysisMode: options.analysisMode,
+          fileSize: file.size,
+        });
+      }
       throw error; // Re-throw for UI to handle
     }
 
-    // Always track other errors
-    analyticsService.track('analysis_error', {
-      filename,
-      error: error instanceof Error ? error.message : String(error),
-      analysisMode: options.analysisMode,
-      presetId: options.presetId,
-      fileSize: file.size,
-      fileType: file instanceof File ? file.name.split('.').pop()?.toLowerCase() : 'unknown',
-    });
+    // Track errors only if not in batch mode (to save Umami quota)
+    if (!skipIndividualTracking) {
+      analyticsService.track('analysis_error', {
+        filename,
+        error: error instanceof Error ? error.message : String(error),
+        analysisMode: options.analysisMode,
+        presetId: options.presetId,
+        fileSize: file.size,
+        fileType: file instanceof File ? file.name.split('.').pop()?.toLowerCase() : 'unknown',
+      });
+    }
     throw error; // Re-throw the error to be handled by the caller
   } finally {
     if (result && !skipIndividualTracking) {
@@ -205,7 +210,8 @@ async function analyzeFullFile(
   criteria?: any,
   scriptsList?: string[],
   speakerId?: string,
-  progressCallback?: (message: string, progress: number) => void
+  progressCallback?: (message: string, progress: number) => void,
+  skipIndividualTracking?: boolean
 ): Promise<AudioResults> {
   // Report progress for basic analysis
   if (progressCallback) {
@@ -274,15 +280,17 @@ async function analyzeFullFile(
       arrayBuffer = null; // Explicitly release 44MB ArrayBuffer for GC
       result = { ...result, ...advancedResults };
 
-      // Track experimental feature usage
-      analyticsService.track('experimental_analysis_used', {
-        hasStereoSeparation: !!advancedResults.stereoSeparation,
-        stereoType: advancedResults.stereoSeparation?.stereoType,
-        hasMicBleed: !!advancedResults.micBleed,
-        hasReverb: !!advancedResults.reverbInfo,
-        hasNoiseFloor: advancedResults.noiseFloorDb !== undefined,
-        hasSilenceDetection: !!advancedResults.silenceInfo,
-      });
+      // Track experimental feature usage only if not in batch mode (to save Umami quota)
+      if (!skipIndividualTracking) {
+        analyticsService.track('experimental_analysis_used', {
+          hasStereoSeparation: !!advancedResults.stereoSeparation,
+          stereoType: advancedResults.stereoSeparation?.stereoType,
+          hasMicBleed: !!advancedResults.micBleed,
+          hasReverb: !!advancedResults.reverbInfo,
+          hasNoiseFloor: advancedResults.noiseFloorDb !== undefined,
+          hasSilenceDetection: !!advancedResults.silenceInfo,
+        });
+      }
     }
 
     // Validation against preset criteria
