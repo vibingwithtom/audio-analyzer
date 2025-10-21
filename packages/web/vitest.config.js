@@ -15,13 +15,13 @@ export default defineConfig({
     })
   ],
   test: {
-    // Transform @testing-library/svelte despite being in node_modules
-    transformMode: {
-      ssr: ['/node_modules/@testing-library/svelte/'],
-      web: ['/src/', '/tests/']
-    },
     globals: true,
     environment: 'jsdom',
+    environmentOptions: {
+      jsdom: {
+        resources: 'usable'
+      }
+    },
     setupFiles: ['./tests/setup.ts'],
     exclude: [
       'node_modules/**',
