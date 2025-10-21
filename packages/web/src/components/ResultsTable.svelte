@@ -305,6 +305,14 @@
 
   // Helper to determine worst status across all experimental metrics for row background color
   function getExperimentalRowStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
+    // Check if validation failed (file type, sample rate, bit depth, channels)
+    if (result.validation?.fileType?.status === 'fail' ||
+        result.validation?.sampleRate?.status === 'fail' ||
+        result.validation?.bitDepth?.status === 'fail' ||
+        result.validation?.channels?.status === 'fail') {
+      return 'fail'; // Validation failure - instant fail
+    }
+
     let worstStatus: 'pass' | 'warning' | 'fail' = 'pass';
 
     // Helper to update worst status
@@ -316,9 +324,15 @@
       }
     };
 
-    // Check validation status (preset criteria)
-    if (result.status && result.status !== 'pass') {
-      updateWorst(result.status);
+    // Check basic property validations (if they exist)
+    if (result.validation?.sampleRate?.status) {
+      updateWorst(result.validation.sampleRate.status);
+    }
+    if (result.validation?.bitDepth?.status) {
+      updateWorst(result.validation.bitDepth.status);
+    }
+    if (result.validation?.channels?.status) {
+      updateWorst(result.validation.channels.status);
     }
 
     // Check normalization
