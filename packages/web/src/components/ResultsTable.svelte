@@ -907,13 +907,13 @@
                   return tooltip;
                 })() : 'Reverb analysis data not available'}
               >
-                {#if result.reverbInfo}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.reverbInfo}
                   <span class="value-{getReverbClass(result.reverbInfo.label)}">
                     ~{result.reverbInfo.time.toFixed(2)} s
                   </span>
                   <span class="subtitle">{result.reverbInfo.label}</span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -941,20 +941,22 @@
                   return tooltip;
                 })()}
               >
-                {#if result.leadingSilence !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.leadingSilence !== undefined}
                   <div>
                     <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
                     <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
                     <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
                   </div>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
               </td>
               <td>
-                {#if result.stereoSeparation}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.stereoSeparation}
                   <span class="value-{getStereoTypeClass(result)}">
                     {result.stereoSeparation.stereoType}
                   </span>
@@ -963,8 +965,6 @@
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
                   </span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -998,7 +998,9 @@
                   return tooltip;
                 })() : 'Speech overlap analysis only runs for Conversational Stereo files'}
               >
-                {#if result.conversationalAnalysis?.overlap}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.conversationalAnalysis?.overlap}
                   {@const longestDuration = getLongestOverlapDuration(result)}
                   <div>
                     <span class="subtitle">%: <span class="value-{getOverlapPercentageClass(result)}">{result.conversationalAnalysis.overlap.overlapPercentage.toFixed(1)}%</span></span>
@@ -1006,8 +1008,6 @@
                       <span class="subtitle">Max: <span class="value-{getOverlapSegmentClass(result)}">{longestDuration.toFixed(1)}s</span></span>
                     {/if}
                   </div>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -1075,12 +1075,12 @@
                   }
                 })() : 'Mic bleed analysis only runs for Conversational Stereo files'}
               >
-                {#if result.micBleed}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.micBleed}
                   <span class="value-{getUnifiedMicBleedClass(result.micBleed)}">
                     {getUnifiedMicBleedLabel(result.micBleed)}
                   </span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
