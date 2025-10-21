@@ -703,11 +703,7 @@
                 <StatusBadge status={rowStatus} />
               </td>
               <!-- File Type column -->
-              <td
-                class:validation-pass={getValidationStatus(result, 'fileType') === 'pass'}
-                class:validation-warning={getValidationStatus(result, 'fileType') === 'warning'}
-                class:validation-fail={getValidationStatus(result, 'fileType') === 'fail'}
-              >
+              <td>
                 {#if result.validation?.fileType?.status === 'fail'}
                   --
                 {:else if result.fileType}
@@ -717,11 +713,7 @@
                 {/if}
               </td>
               <!-- Sample Rate column -->
-              <td
-                class:validation-pass={getValidationStatus(result, 'sampleRate') === 'pass'}
-                class:validation-warning={getValidationStatus(result, 'sampleRate') === 'warning'}
-                class:validation-fail={getValidationStatus(result, 'sampleRate') === 'fail'}
-              >
+              <td>
                 {#if result.validation?.sampleRate?.status === 'fail'}
                   --
                 {:else if result.sampleRate !== undefined}
@@ -731,11 +723,7 @@
                 {/if}
               </td>
               <!-- Bit Depth column -->
-              <td
-                class:validation-pass={getValidationStatus(result, 'bitDepth') === 'pass'}
-                class:validation-warning={getValidationStatus(result, 'bitDepth') === 'warning'}
-                class:validation-fail={getValidationStatus(result, 'bitDepth') === 'fail'}
-              >
+              <td>
                 {#if result.validation?.bitDepth?.status === 'fail'}
                   --
                 {:else if result.bitDepth !== undefined}
@@ -745,11 +733,7 @@
                 {/if}
               </td>
               <!-- Channels column -->
-              <td
-                class:validation-pass={getValidationStatus(result, 'channels') === 'pass'}
-                class:validation-warning={getValidationStatus(result, 'channels') === 'warning'}
-                class:validation-fail={getValidationStatus(result, 'channels') === 'fail'}
-              >
+              <td>
                 {#if result.validation?.channels?.status === 'fail'}
                   --
                 {:else if result.channels !== undefined}
@@ -759,11 +743,7 @@
                 {/if}
               </td>
               <!-- Duration column -->
-              <td
-                class:validation-pass={getValidationStatus(result, 'duration') === 'pass'}
-                class:validation-warning={getValidationStatus(result, 'duration') === 'warning'}
-                class:validation-fail={getValidationStatus(result, 'duration') === 'fail'}
-              >
+              <td>
                 {#if result.validation?.fileType?.status === 'fail'}
                   --
                 {:else if result.duration !== undefined}
