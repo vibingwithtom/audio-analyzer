@@ -705,9 +705,11 @@
               <!-- File Type column -->
               <td>
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.fileType}
-                  {result.fileType}
+                  <span style="color: {result.validation?.fileType?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {result.fileType}
+                  </span>
                 {:else}
                   N/A
                 {/if}
@@ -715,9 +717,11 @@
               <!-- Sample Rate column -->
               <td>
                 {#if result.validation?.sampleRate?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.sampleRate !== undefined}
-                  {formatSampleRate(result.sampleRate)}
+                  <span style="color: {result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatSampleRate(result.sampleRate)}
+                  </span>
                 {:else}
                   N/A
                 {/if}
@@ -725,9 +729,11 @@
               <!-- Bit Depth column -->
               <td>
                 {#if result.validation?.bitDepth?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.bitDepth !== undefined}
-                  {formatBitDepth(result.bitDepth)}
+                  <span style="color: {result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatBitDepth(result.bitDepth)}
+                  </span>
                 {:else}
                   N/A
                 {/if}
@@ -735,9 +741,11 @@
               <!-- Channels column -->
               <td>
                 {#if result.validation?.channels?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.channels !== undefined}
-                  {formatChannels(result.channels)}
+                  <span style="color: {result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatChannels(result.channels)}
+                  </span>
                 {:else}
                   N/A
                 {/if}
@@ -745,9 +753,11 @@
               <!-- Duration column -->
               <td>
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.duration !== undefined}
-                  {formatDuration(result.duration)}
+                  <span style="color: {result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatDuration(result.duration)}
+                  </span>
                 {:else}
                   N/A
                 {/if}
