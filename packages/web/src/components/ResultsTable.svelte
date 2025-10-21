@@ -897,12 +897,14 @@
                     {result.stereoSeparation.stereoType}
                   </span>
                   <span class="subtitle">{Math.round(result.stereoSeparation.stereoConfidence * 100)}% conf</span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
-                {:else}
+                {:else if result.channels !== undefined}
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
                   </span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
+                {:else}
+                  N/A
                 {/if}
               </td>
               <!-- Speech Overlap -->
