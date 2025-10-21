@@ -3,7 +3,7 @@
  * Used by both ResultsDisplay and ResultsTable components
  */
 
-import type { AudioResults } from '@audio-analyzer/core';
+import type { AudioResults } from '../types';
 
 /**
  * Classify normalization status into a validation result
