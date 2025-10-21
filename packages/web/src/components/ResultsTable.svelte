@@ -869,6 +869,8 @@
                     {result.stereoSeparation.stereoType}
                   </span>
                   <span class="subtitle">{Math.round(result.stereoSeparation.stereoConfidence * 100)}% conf</span>
+                {:else if result.status === 'fail' || result.status === 'error'}
+                  --
                 {:else}
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
