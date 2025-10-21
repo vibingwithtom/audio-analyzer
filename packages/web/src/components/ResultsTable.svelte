@@ -765,7 +765,7 @@
               <!-- Peak Level -->
               <td>
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.peakDb !== undefined}
                   {result.peakDb.toFixed(1)} dB
                 {:else}
@@ -775,7 +775,7 @@
               <!-- Normalization -->
               <td>
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.normalizationStatus}
                   <span class="value-{getNormalizationClass(result.normalizationStatus)}">
                     {result.normalizationStatus.message || 'N/A'}
@@ -847,7 +847,7 @@
                     <span class="subtitle">{severity.eventCount} event{severity.eventCount > 1 ? 's' : ''}</span>
                   {/if}
                 {:else if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.peakDb !== undefined}
                   <span class="value-success">Not detected</span>
                 {:else}
@@ -879,7 +879,7 @@
                 })() : 'Noise floor analysis data not available'}
               >
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.noiseFloorDb !== undefined}
                   <span class="value-{getNoiseFloorClass(result.noiseFloorDb)}">
                     {result.noiseFloorDb === -Infinity ? '-∞' : result.noiseFloorDb.toFixed(1)} dB
@@ -928,7 +928,7 @@
                 })() : 'Reverb analysis data not available'}
               >
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.reverbInfo}
                   <span class="value-{getReverbClass(result.reverbInfo.label)}">
                     ~{result.reverbInfo.time.toFixed(2)} s
@@ -962,7 +962,7 @@
                 })()}
               >
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.leadingSilence !== undefined}
                   <div>
                     <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
@@ -975,7 +975,7 @@
               </td>
               <td>
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.stereoSeparation}
                   <span class="value-{getStereoTypeClass(result)}">
                     {result.stereoSeparation.stereoType}
@@ -1019,7 +1019,7 @@
                 })() : 'Speech overlap analysis only runs for Conversational Stereo files'}
               >
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.conversationalAnalysis?.overlap}
                   {@const longestDuration = getLongestOverlapDuration(result)}
                   <div>
@@ -1096,7 +1096,7 @@
                 })() : 'Mic bleed analysis only runs for Conversational Stereo files'}
               >
                 {#if result.validation?.fileType?.status === 'fail'}
-                  --
+                  <span style="color: #ef4444;">--</span>
                 {:else if result.micBleed}
                   <span class="value-{getUnifiedMicBleedClass(result.micBleed)}">
                     {getUnifiedMicBleedLabel(result.micBleed)}
