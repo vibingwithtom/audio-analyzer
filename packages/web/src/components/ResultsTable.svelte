@@ -141,6 +141,36 @@
     return result.validation[field]?.issue;
   }
 
+  /**
+   * Compute status for audio-only mode (only consider basic validation fields)
+   */
+  function getAudioOnlyStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
+    // Check if any basic validation failed
+    if (result.validation?.fileType?.status === 'fail' ||
+        result.validation?.sampleRate?.status === 'fail' ||
+        result.validation?.bitDepth?.status === 'fail' ||
+        result.validation?.channels?.status === 'fail' ||
+        result.validation?.duration?.status === 'fail') {
+      return 'fail';
+    }
+
+    // For error status (file read failures, etc), preserve it
+    if (result.status === 'error') {
+      return 'error';
+    }
+
+    // Check for warnings in basic validation
+    if (result.validation?.fileType?.status === 'warning' ||
+        result.validation?.sampleRate?.status === 'warning' ||
+        result.validation?.bitDepth?.status === 'warning' ||
+        result.validation?.channels?.status === 'warning' ||
+        result.validation?.duration?.status === 'warning') {
+      return 'warning';
+    }
+
+    return 'pass';
+  }
+
   function getAllValidationIssues(result: AudioResults): string[] {
     if (!result.validation) return [];
     const issues: string[] = [];
@@ -1238,7 +1268,8 @@
     </thead>
     <tbody>
       {#each results as result, index (`${result.filename}-${index}`)}
-        <tr class:status-pass={result.status === 'pass'} class:status-warning={result.status === 'warning'} class:status-fail={result.status === 'fail'}>
+        {@const rowStatus = getAudioOnlyStatus(result)}
+        <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
           <td
             class:validation-pass={getValidationStatus(result, 'filename') === 'pass'}
             class:validation-warning={getValidationStatus(result, 'filename') === 'warning'}
@@ -1248,7 +1279,7 @@
           >
             {result.filename}
           </td>
-          <td><StatusBadge status={result.status} /></td>
+          <td><StatusBadge status={rowStatus} /></td>
           {#if metadataOnly}
             <!-- Filename-only mode: Show error details inline -->
             <td class="error-details-cell">
