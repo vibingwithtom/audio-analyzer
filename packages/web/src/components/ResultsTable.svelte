@@ -4,6 +4,15 @@
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
+  import {
+    computeExperimentalStatus,
+    getNormalizationStatus,
+    getReverbStatus,
+    getNoiseFloorStatus,
+    getSilenceStatus,
+    getClippingStatus,
+    getMicBleedStatus
+  } from '../utils/status-utils';
 
   import { onMount, onDestroy } from 'svelte';
 
@@ -25,9 +34,12 @@
   let hasHorizontalScroll = $state(false);
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
+  let isFullscreen = $state(false);
 
   // Lazy blob URL management - create on-demand to prevent memory buildup
-  const blobUrlCache = new Map<string, string>(); // filename -> blob URL
+  // Use WeakMap keyed by result object to avoid issues with duplicate filenames
+  const blobUrlCache = new WeakMap<AudioResults, string>();
+  const createdUrls = new Set<string>(); // Track URLs for cleanup
 
   function getAudioUrl(result: AudioResults): string | null {
     // Use existing audioUrl if available
@@ -37,29 +49,32 @@
     const file = (result as any).file;
     if (!file) return null;
 
-    // Check cache first
-    if (blobUrlCache.has(result.filename)) {
-      return blobUrlCache.get(result.filename)!;
+    // Check cache first (keyed by result object, not filename)
+    if (blobUrlCache.has(result)) {
+      return blobUrlCache.get(result)!;
     }
 
     // Create blob URL and cache it
     const blobUrl = URL.createObjectURL(file);
-    blobUrlCache.set(result.filename, blobUrl);
+    blobUrlCache.set(result, blobUrl);
+    createdUrls.add(blobUrl);
     return blobUrl;
   }
 
   // Cleanup blob URLs on component destroy
   onDestroy(() => {
-    blobUrlCache.forEach(url => URL.revokeObjectURL(url));
-    blobUrlCache.clear();
+    createdUrls.forEach(url => URL.revokeObjectURL(url));
+    createdUrls.clear();
   });
 
   // Check if table has horizontal scroll and which direction
   function checkScroll() {
     if (tableWrapper) {
       hasHorizontalScroll = tableWrapper.scrollWidth > tableWrapper.clientWidth;
-      canScrollLeft = tableWrapper.scrollLeft > 0;
-      canScrollRight = tableWrapper.scrollLeft < tableWrapper.scrollWidth - tableWrapper.clientWidth;
+      canScrollLeft = tableWrapper.scrollLeft > 1; // 1px tolerance for rounding
+      // Add 1px tolerance to account for sub-pixel rounding in browsers
+      const maxScroll = tableWrapper.scrollWidth - tableWrapper.clientWidth;
+      canScrollRight = tableWrapper.scrollLeft < maxScroll - 1;
     }
   }
 
@@ -77,22 +92,41 @@
     });
   }
 
+  // Fullscreen toggle
+  function toggleFullscreen() {
+    isFullscreen = !isFullscreen;
+  }
+
+  // Handle ESC key to exit fullscreen
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && isFullscreen) {
+      isFullscreen = false;
+    }
+  }
+
   // Check scroll on mount and when results change
   onMount(() => {
-    checkScroll();
     window.addEventListener('resize', checkScroll);
-
-    // Listen for scroll events to update button states
-    if (tableWrapper) {
-      tableWrapper.addEventListener('scroll', checkScroll);
-    }
+    window.addEventListener('keydown', handleKeydown);
 
     return () => {
       window.removeEventListener('resize', checkScroll);
-      if (tableWrapper) {
-        tableWrapper.removeEventListener('scroll', checkScroll);
-      }
+      window.removeEventListener('keydown', handleKeydown);
     };
+  });
+
+  // Set up scroll listener when tableWrapper is bound (using $effect for reactivity)
+  $effect(() => {
+    if (tableWrapper) {
+      checkScroll(); // Initial check
+      const handleScroll = () => checkScroll();
+      const wrapper = tableWrapper; // Capture reference for cleanup
+      wrapper.addEventListener('scroll', handleScroll);
+
+      return () => {
+        wrapper.removeEventListener('scroll', handleScroll);
+      };
+    }
   });
 
   // Recheck scroll when results change
@@ -110,6 +144,36 @@
   function getValidationIssue(result: AudioResults, field: string): string | undefined {
     if (!result.validation) return undefined;
     return result.validation[field]?.issue;
+  }
+
+  /**
+   * Compute status for audio-only mode (only consider basic validation fields)
+   */
+  function getAudioOnlyStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
+    // Check if any basic validation failed
+    if (result.validation?.fileType?.status === 'fail' ||
+        result.validation?.sampleRate?.status === 'fail' ||
+        result.validation?.bitDepth?.status === 'fail' ||
+        result.validation?.channels?.status === 'fail' ||
+        result.validation?.duration?.status === 'fail') {
+      return 'fail';
+    }
+
+    // For error status (file read failures, etc), preserve it
+    if (result.status === 'error') {
+      return 'error';
+    }
+
+    // Check for warnings in basic validation
+    if (result.validation?.fileType?.status === 'warning' ||
+        result.validation?.sampleRate?.status === 'warning' ||
+        result.validation?.bitDepth?.status === 'warning' ||
+        result.validation?.channels?.status === 'warning' ||
+        result.validation?.duration?.status === 'warning') {
+      return 'warning';
+    }
+
+    return 'pass';
   }
 
   function getAllValidationIssues(result: AudioResults): string[] {
@@ -131,16 +195,11 @@
 
   // Helper functions for experimental metrics color-coding
   function getNormalizationClass(status: any): string {
-    if (!status) return '';
-    if (status.status === 'normalized') return 'success';
-    return 'warning';
+    return getNormalizationStatus(status);
   }
 
   function getReverbClass(label: string): string {
-    if (!label) return '';
-    if (label.includes('Excellent') || label.includes('Good')) return 'success';
-    if (label.includes('Fair')) return 'warning';
-    return 'error';
+    return getReverbStatus(label);
   }
 
   function getMicBleedClass(micBleed: any): string {
@@ -159,19 +218,7 @@
 
   // Unified mic bleed detection using OR logic (either method detects = possible bleed)
   function getUnifiedMicBleedClass(micBleed: any): string {
-    if (!micBleed) return '';
-
-    // Check OLD method: > -60 dB means detected
-    const oldDetected = micBleed.old &&
-      (micBleed.old.leftChannelBleedDb > -60 || micBleed.old.rightChannelBleedDb > -60);
-
-    // Check NEW method: > 0.5% confirmed bleed means detected
-    const newDetected = micBleed.new &&
-      (micBleed.new.percentageConfirmedBleed > 0.5);
-
-    // OR logic: if either detects, show warning
-    if (oldDetected || newDetected) return 'warning';
-    return 'success';
+    return getMicBleedStatus(micBleed);
   }
 
   function getUnifiedMicBleedLabel(micBleed: any): string {
@@ -191,29 +238,11 @@
   }
 
   function getNoiseFloorClass(noiseFloorDb: number | undefined): string {
-    if (noiseFloorDb === undefined || noiseFloorDb === -Infinity) return '';
-    // Excellent/Good: <= -60 dB
-    if (noiseFloorDb <= -60) return 'success';
-    // Fair: -60 to -50 dB
-    if (noiseFloorDb <= -50) return 'warning';
-    // Poor: > -50 dB
-    return 'error';
+    return getNoiseFloorStatus(noiseFloorDb);
   }
 
   function getSilenceClass(seconds: number | undefined, type: 'lead-trail' | 'max'): string {
-    if (seconds === undefined || seconds === null) return '';
-
-    if (type === 'lead-trail') {
-      // Leading/Trailing silence thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    } else {
-      // Max silence gap thresholds
-      if (seconds < 5) return 'success';      // Good: < 5s
-      if (seconds < 10) return 'warning';     // Warning: 5-9s
-      return 'error';                         // Issue: >= 10s
-    }
+    return getSilenceStatus(seconds, type);
   }
 
   function formatTime(seconds: number | undefined): string {
@@ -300,12 +329,18 @@
   }
 
   function getClippingClass(clippingAnalysis: any): string {
-    return getClippingSeverity(clippingAnalysis).level;
+    return getClippingStatus(clippingAnalysis);
   }
 
   // Helper to determine worst status across all experimental metrics for row background color
   function getExperimentalRowStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
-    let worstStatus: 'pass' | 'warning' | 'fail' = 'pass';
+    // Use the shared status computation, then map error to fail for table row styling
+    const sharedStatus = computeExperimentalStatus(result);
+    if (sharedStatus === 'error') {
+      return 'fail'; // Map error to fail for table row display
+    }
+
+    let worstStatus: 'pass' | 'warning' | 'fail' = sharedStatus as 'pass' | 'warning' | 'fail';
 
     // Helper to update worst status
     const updateWorst = (status: string) => {
@@ -316,42 +351,8 @@
       }
     };
 
-    // Check validation status (preset criteria)
-    if (result.status && result.status !== 'pass') {
-      updateWorst(result.status);
-    }
-
-    // Check normalization
-    const normClass = getNormalizationClass(result.normalizationStatus);
-    updateWorst(normClass);
-
-    // Check clipping
-    const clippingClass = getClippingClass(result.clippingAnalysis);
-    updateWorst(clippingClass);
-
-    // Check noise floor
-    const noiseClass = getNoiseFloorClass(result.noiseFloorDb);
-    updateWorst(noiseClass);
-
-    // Check reverb
-    if (result.reverbInfo) {
-      const reverbClass = getReverbClass(result.reverbInfo.label);
-      updateWorst(reverbClass);
-    }
-
-    // Check silence (leading, trailing, max)
-    if (result.leadingSilence !== undefined) {
-      const leadClass = getSilenceClass(result.leadingSilence, 'lead-trail');
-      updateWorst(leadClass);
-    }
-    if (result.trailingSilence !== undefined) {
-      const trailClass = getSilenceClass(result.trailingSilence, 'lead-trail');
-      updateWorst(trailClass);
-    }
-    if (result.longestSilence !== undefined) {
-      const maxClass = getSilenceClass(result.longestSilence, 'max');
-      updateWorst(maxClass);
-    }
+    // Check preset-aware validations (these require $selectedPreset)
+    // These are not included in the shared computeExperimentalStatus
 
     // Check stereo type
     const stereoClass = getStereoTypeClass(result);
@@ -360,12 +361,6 @@
     // Check speech overlap
     const overlapClass = getOverlapClass(result);
     updateWorst(overlapClass);
-
-    // Check mic bleed
-    if (result.micBleed) {
-      const micBleedClass = getUnifiedMicBleedClass(result.micBleed);
-      updateWorst(micBleedClass);
-    }
 
     return worstStatus;
   }
@@ -521,7 +516,86 @@
 
   /* Container for experimental table with gradient overlay */
   .experimental-table-container {
+    /* No overflow or positioning - just container for toolbar and table */
+  }
+
+  /* Fullscreen mode */
+  .experimental-table-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: var(--bg-primary, #ffffff);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .experimental-table-container.fullscreen .table-with-controls {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .experimental-table-container.fullscreen .experimental-table-wrapper {
+    height: 100%;
+    overflow: auto;
+  }
+
+  /* Wrapper for table + scroll controls - clips buttons at table boundaries */
+  .table-with-controls {
     position: relative;
+    overflow: hidden; /* Clips buttons and shadow at table boundaries, not container boundaries */
+  }
+
+  /* Cover scrollbar under sticky columns */
+  .table-with-controls::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 370px; /* Width of sticky columns (250px + 120px) */
+    height: 20px; /* Height of typical scrollbar */
+    background: var(--bg-primary, #ffffff);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  :global([data-theme="dark"]) .table-with-controls::after {
+    background: var(--bg-primary, #1e1e1e);
+  }
+
+  /* Table toolbar with expand button */
+  .table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .expand-button {
+    background: var(--bg-secondary, #f5f5f5);
+    border: 1px solid var(--bg-tertiary, #e0e0e0);
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    z-index: 100;
+    position: relative;
+  }
+
+  .expand-button:hover {
+    background: var(--bg-tertiary, #e0e0e0);
+    transform: scale(1.05);
+  }
+
+  .expand-button:active {
+    transform: scale(0.95);
   }
 
   /* Experimental table should be scrollable horizontally if needed */
@@ -531,11 +605,62 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
+  /* Remove overflow from table inside experimental wrapper to allow sticky */
+  .experimental-table-wrapper .results-table {
+    overflow: visible;
+    width: max-content; /* Force table to be as wide as its content */
+    min-width: 100%; /* But at least fill the container */
+  }
+
   /* Sticky header for experimental table */
   .experimental-table-wrapper thead {
     position: sticky;
     top: 0;
     z-index: 10;
+  }
+
+  /* Sticky first column (Filename) for experimental table */
+  .experimental-table-wrapper table th:first-child,
+  .experimental-table-wrapper table td:first-child {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--bg-primary, #ffffff);
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+    width: 250px;
+    max-width: 250px;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .experimental-table-wrapper table thead th:first-child {
+    z-index: 11; /* Higher than body cells, same level as sticky header */
+  }
+
+  /* Sticky second column (Status) for experimental table */
+  .experimental-table-wrapper table th:nth-child(2),
+  .experimental-table-wrapper table td:nth-child(2) {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 250px; /* Position after Filename column (250px fixed width) */
+    z-index: 2;
+    background: var(--bg-primary, #ffffff);
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+    width: 120px;
+    max-width: 120px;
+  }
+
+  .experimental-table-wrapper table thead th:nth-child(2) {
+    z-index: 11;
+  }
+
+  /* Dark mode support */
+  :global([data-theme="dark"]) .experimental-table-wrapper table th:first-child,
+  :global([data-theme="dark"]) .experimental-table-wrapper table td:first-child,
+  :global([data-theme="dark"]) .experimental-table-wrapper table th:nth-child(2),
+  :global([data-theme="dark"]) .experimental-table-wrapper table td:nth-child(2) {
+    background: var(--bg-primary, #1e1e1e);
   }
 
   /* Shadow gradient overlay - stays fixed at right edge */
@@ -594,8 +719,8 @@
   }
 
   .scroll-button.left {
-    left: 0;
-    border-radius: 8px 0 0 8px;
+    left: 370px; /* Position after sticky Filename (250px) + Status (120px) columns */
+    border-radius: 0; /* No rounded corners since it's mid-table */
   }
 
   .scroll-button.right {
@@ -654,12 +779,31 @@
 <div class="results-container">
   {#if experimentalMode}
     <!-- EXPERIMENTAL MODE TABLE -->
-    <div class="experimental-table-container">
-      <div class="experimental-table-wrapper" bind:this={tableWrapper}>
-        <table class="results-table">
+    <div class="experimental-table-container" class:fullscreen={isFullscreen}>
+      <!-- Table header with expand button -->
+      <div class="table-toolbar">
+        <button
+          class="expand-button"
+          onclick={toggleFullscreen}
+          aria-label="Toggle fullscreen"
+          title="Expand table to fullscreen (ESC to exit)"
+        >
+          {isFullscreen ? '⊗' : '⛶'}
+        </button>
+      </div>
+      <!-- Wrapper for table + scroll controls (clips buttons at table boundaries) -->
+      <div class="table-with-controls">
+        <div class="experimental-table-wrapper" bind:this={tableWrapper}>
+          <table class="results-table">
         <thead>
           <tr>
             <th>Filename</th>
+            <th>Status</th>
+            <th>File Type</th>
+            <th>Sample Rate</th>
+            <th>Bit Depth</th>
+            <th>Channels</th>
+            <th>Duration</th>
             <th>Peak Level</th>
             <th>Normalization</th>
             <th>Clipping</th>
@@ -669,16 +813,93 @@
             <th>Stereo Separation</th>
             <th>Speech Overlap</th>
             <th>Mic Bleed</th>
+            <th>Play</th>
           </tr>
         </thead>
         <tbody>
-          {#each results as result (result.filename)}
+          {#each results as result, index (`${result.filename}-${index}`)}
             {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
-              <td>{result.filename}</td>
-              <td>{result.peakDb !== undefined ? result.peakDb.toFixed(1) + ' dB' : 'N/A'}</td>
               <td>
-                {#if result.normalizationStatus}
+                {result.filename}
+              </td>
+              <!-- Status column -->
+              <td>
+                <StatusBadge status={rowStatus} />
+              </td>
+              <!-- File Type column -->
+              <td>
+                {#if result.fileType}
+                  <span style="color: {result.validation?.fileType?.status === 'fail' ? '#ef4444' : result.validation?.fileType?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {result.fileType.toUpperCase()}
+                  </span>
+                {:else}
+                  <span style="color: #ef4444;">Unknown</span>
+                {/if}
+              </td>
+              <!-- Sample Rate column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.sampleRate !== undefined}
+                  <span style="color: {result.validation?.sampleRate?.status === 'fail' ? '#ef4444' : result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatSampleRate(result.sampleRate)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Bit Depth column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.bitDepth !== undefined}
+                  <span style="color: {result.validation?.bitDepth?.status === 'fail' ? '#ef4444' : result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatBitDepth(result.bitDepth)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Channels column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.channels !== undefined}
+                  <span style="color: {result.validation?.channels?.status === 'fail' ? '#ef4444' : result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatChannels(result.channels)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Duration column -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.duration !== undefined}
+                  <span style="color: {result.validation?.duration?.status === 'fail' ? '#ef4444' : result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {formatDuration(result.duration)}
+                  </span>
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Peak Level -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.peakDb !== undefined}
+                  {result.peakDb.toFixed(1)} dB
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <!-- Normalization -->
+              <td>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.normalizationStatus}
                   <span class="value-{getNormalizationClass(result.normalizationStatus)}">
                     {result.normalizationStatus.message || 'N/A'}
                   </span>
@@ -738,7 +959,7 @@
                   }
 
                   return tooltip;
-                })() : 'Clipping analysis data not available'}
+                })() : 'No clipping detected. Peak levels are below the threshold where clipping could occur.'}
               >
                 {#if result.clippingAnalysis}
                   {@const severity = getClippingSeverity(result.clippingAnalysis)}
@@ -748,6 +969,10 @@
                   {#if severity.eventCount > 0}
                     <span class="subtitle">{severity.eventCount} event{severity.eventCount > 1 ? 's' : ''}</span>
                   {/if}
+                {:else if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.peakDb !== undefined}
+                  <span class="value-success">Not detected</span>
                 {:else}
                   N/A
                 {/if}
@@ -776,7 +1001,9 @@
                   return tooltip;
                 })() : 'Noise floor analysis data not available'}
               >
-                {#if result.noiseFloorDb !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.noiseFloorDb !== undefined}
                   <span class="value-{getNoiseFloorClass(result.noiseFloorDb)}">
                     {result.noiseFloorDb === -Infinity ? '-∞' : result.noiseFloorDb.toFixed(1)} dB
                   </span>
@@ -823,7 +1050,9 @@
                   return tooltip;
                 })() : 'Reverb analysis data not available'}
               >
-                {#if result.reverbInfo}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.reverbInfo}
                   <span class="value-{getReverbClass(result.reverbInfo.label)}">
                     ~{result.reverbInfo.time.toFixed(2)} s
                   </span>
@@ -855,22 +1084,32 @@
                   return tooltip;
                 })()}
               >
-                <div>
-                  <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
-                  <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
-                  <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
-                </div>
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.leadingSilence !== undefined}
+                  <div>
+                    <span class="subtitle">Lead: <span class="value-{getSilenceClass(result.leadingSilence, 'lead-trail')}">{formatTime(result.leadingSilence)}</span></span>
+                    <span class="subtitle">Trail: <span class="value-{getSilenceClass(result.trailingSilence, 'lead-trail')}">{formatTime(result.trailingSilence)}</span></span>
+                    <span class="subtitle">Max: <span class="value-{getSilenceClass(result.longestSilence, 'max')}">{formatTime(result.longestSilence)}</span></span>
+                  </div>
+                {:else}
+                  N/A
+                {/if}
               </td>
               <td>
-                {#if result.stereoSeparation}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.stereoSeparation}
                   <span class="value-{getStereoTypeClass(result)}">
                     {result.stereoSeparation.stereoType}
                   </span>
                   <span class="subtitle">{Math.round(result.stereoSeparation.stereoConfidence * 100)}% conf</span>
-                {:else}
+                {:else if result.channels !== undefined}
                   <span class="value-{getStereoTypeClass(result)}">
                     Mono file
                   </span>
+                {:else}
+                  N/A
                 {/if}
               </td>
               <!-- Speech Overlap -->
@@ -902,7 +1141,9 @@
                   return tooltip;
                 })() : 'Speech overlap analysis only runs for Conversational Stereo files'}
               >
-                {#if result.conversationalAnalysis?.overlap}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.conversationalAnalysis?.overlap}
                   {@const longestDuration = getLongestOverlapDuration(result)}
                   <div>
                     <span class="subtitle">%: <span class="value-{getOverlapPercentageClass(result)}">{result.conversationalAnalysis.overlap.overlapPercentage.toFixed(1)}%</span></span>
@@ -977,7 +1218,9 @@
                   }
                 })() : 'Mic bleed analysis only runs for Conversational Stereo files'}
               >
-                {#if result.micBleed}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.micBleed}
                   <span class="value-{getUnifiedMicBleedClass(result.micBleed)}">
                     {getUnifiedMicBleedLabel(result.micBleed)}
                   </span>
@@ -985,14 +1228,24 @@
                   N/A
                 {/if}
               </td>
+              <!-- Play -->
+              <td>
+                {#if getAudioUrl(result)}
+                  <audio controls src={getAudioUrl(result)}></audio>
+                {:else if result.externalUrl}
+                  <a href={result.externalUrl} target="_blank" rel="noopener noreferrer" class="external-link-btn" title="View in Box/Google Drive">
+                    ▶
+                  </a>
+                {/if}
+              </td>
             </tr>
           {/each}
         </tbody>
       </table>
     </div>
-    <!-- Shadow gradient overlay - stays fixed at right edge -->
+    <!-- Shadow gradient overlay - positioned relative to table-with-controls wrapper -->
     <div class="scroll-shadow" class:visible={hasHorizontalScroll}></div>
-    <!-- Scroll buttons -->
+    <!-- Scroll buttons - positioned relative to table-with-controls wrapper so they don't scroll with content -->
     <button
       class="scroll-button left"
       class:visible={canScrollLeft}
@@ -1009,6 +1262,7 @@
     >
       ▶
     </button>
+  </div>
   </div>
   {:else}
     <!-- STANDARD MODE TABLE -->
@@ -1031,8 +1285,9 @@
       </tr>
     </thead>
     <tbody>
-      {#each results as result (result.filename)}
-        <tr class:status-pass={result.status === 'pass'} class:status-warning={result.status === 'warning'} class:status-fail={result.status === 'fail'}>
+      {#each results as result, index (`${result.filename}-${index}`)}
+        {@const rowStatus = getAudioOnlyStatus(result)}
+        <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
           <td
             class:validation-pass={getValidationStatus(result, 'filename') === 'pass'}
             class:validation-warning={getValidationStatus(result, 'filename') === 'warning'}
@@ -1042,7 +1297,7 @@
           >
             {result.filename}
           </td>
-          <td><StatusBadge status={result.status} /></td>
+          <td><StatusBadge status={rowStatus} /></td>
           {#if metadataOnly}
             <!-- Filename-only mode: Show error details inline -->
             <td class="error-details-cell">

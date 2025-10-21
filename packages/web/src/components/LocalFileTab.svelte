@@ -11,6 +11,7 @@
   import type { AudioResults, ValidationResults } from '../types';
   import { analyticsService } from '../services/analytics-service';
   import { AnalysisCancelledError } from '@audio-analyzer/core';
+  import { FilenameValidator } from '../validation/filename-validator';
 
   let analysisProgress = $state({
     visible: false,
@@ -162,6 +163,30 @@
       // Validate file type against current preset criteria BEFORE analyzing
       if (!isFileTypeAllowed(file.name, $currentCriteria)) {
         const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+
+        // Build validation object
+        const validation: any = {
+          fileType: {
+            status: 'fail',
+            value: formatRejectedFileType(file.name),
+            issue: rejectionReason
+          }
+        };
+
+        // Add filename validation if preset supports it and we're in filename-only mode
+        const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+        if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+          if (preset.filenameValidationType === 'bilingual-pattern') {
+            const filenameValidation = FilenameValidator.validateBilingual(file.name);
+            validation.filename = {
+              status: filenameValidation.status,
+              value: file.name,
+              issue: filenameValidation.issue
+            };
+          }
+          // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+        }
+
         // Set error and failed result
         error = rejectionReason;
         results = {
@@ -174,13 +199,7 @@
           duration: 0,
           status: 'fail',
           error: rejectionReason,
-          validation: {
-            fileType: {
-              status: 'fail',
-              value: formatRejectedFileType(file.name),
-              issue: rejectionReason
-            }
-          }
+          validation
         };
         resultsMode = $analysisMode;
         return; // Don't analyze the file
@@ -272,9 +291,6 @@
     });
 
     try {
-      const tempResults: AudioResults[] = [];
-      const UI_UPDATE_INTERVAL = 10; // Update UI every 10 files to reduce re-render overhead
-
       // Performance profiling
       let lastFileTime = performance.now();
       const memoryAvailable = 'memory' in performance;
@@ -293,7 +309,31 @@
           // Validate file type against current preset criteria
           if (!isFileTypeAllowed(file.name, $currentCriteria)) {
             const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
-            // Create failed result
+
+            // Build validation object
+            const validation: any = {
+              fileType: {
+                status: 'fail',
+                value: formatRejectedFileType(file.name),
+                issue: rejectionReason
+              }
+            };
+
+            // Add filename validation if preset supports it and we're in filename-only mode
+            const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+            if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+              if (preset.filenameValidationType === 'bilingual-pattern') {
+                const filenameValidation = FilenameValidator.validateBilingual(file.name);
+                validation.filename = {
+                  status: filenameValidation.status,
+                  value: file.name,
+                  issue: filenameValidation.issue
+                };
+              }
+              // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+            }
+
+            // Create failed result and add immediately
             const failedResult: AudioResults = {
               filename: file.name,
               fileType: formatRejectedFileType(file.name),
@@ -304,21 +344,9 @@
               duration: 0,
               status: 'fail',
               error: rejectionReason,
-              validation: {
-                fileType: {
-                  status: 'fail',
-                  value: formatRejectedFileType(file.name),
-                  issue: rejectionReason
-                }
-              }
+              validation
             };
-            tempResults.push(failedResult);
-
-            // Batch UI updates
-            if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
-              batchResults = [...batchResults, ...tempResults];
-              tempResults.length = 0; // Clear temp array
-            }
+            batchResults = [...batchResults, failedResult];
             continue; // Skip to next file
           }
 
@@ -333,20 +361,12 @@
           const fileProcessTime = fileEndTime - fileStartTime;
           const gapSinceLastFile = fileStartTime - lastFileTime;
 
-          // Store File reference for lazy blob URL creation ONLY if audio playback is shown
-          // In experimental mode, no audio player is displayed, so don't keep 6GB of files in memory!
-          if ($analysisMode !== 'experimental') {
-            (result as any).file = file;
-          }
+          // Create blob URL immediately for audio playback
+          // Store URL instead of File reference to avoid keeping large files in memory
+          result.audioUrl = URL.createObjectURL(file);
 
-          // Accumulate results
-          tempResults.push(result);
-
-          // Batch UI updates - only update table every N files to prevent constant re-rendering
-          if (tempResults.length >= UI_UPDATE_INTERVAL || i === files.length - 1) {
-            batchResults = [...batchResults, ...tempResults];
-            tempResults.length = 0; // Clear temp array
-          }
+          // Add result immediately for smooth UI updates
+          batchResults = [...batchResults, result];
 
           // Performance logging
           const memInfo = memoryAvailable ? (performance as any).memory : null;
@@ -377,8 +397,8 @@
             break;
           }
 
-          // Add error result to temp array (will be flushed with batch)
-          tempResults.push({
+          // Add error result immediately
+          batchResults = [...batchResults, {
             filename: file.name,
             fileSize: file.size,
             fileType: 'unknown',
@@ -394,13 +414,8 @@
                 issue: err instanceof Error ? err.message : 'Unknown error'
               }
             }
-          });
+          }];
         }
-      }
-
-      // Flush any remaining results
-      if (tempResults.length > 0) {
-        batchResults = [...batchResults, ...tempResults];
       }
     } finally {
       // Track batch completion
@@ -445,6 +460,30 @@
     // Validate file type against current preset criteria
     if (!isFileTypeAllowed(file.name, $currentCriteria)) {
       const rejectionReason = getFileRejectionReason(file.name, $currentCriteria);
+
+      // Build validation object
+      const validation: any = {
+        fileType: {
+          status: 'fail',
+          value: formatRejectedFileType(file.name),
+          issue: rejectionReason
+        }
+      };
+
+      // Add filename validation if preset supports it and we're in filename-only mode
+      const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+      if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+        if (preset.filenameValidationType === 'bilingual-pattern') {
+          const filenameValidation = FilenameValidator.validateBilingual(file.name);
+          validation.filename = {
+            status: filenameValidation.status,
+            value: file.name,
+            issue: filenameValidation.issue
+          };
+        }
+        // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+      }
+
       // Return failed result without analyzing
       return {
         filename: file.name,
@@ -456,13 +495,7 @@
         duration: 0,
         status: 'fail',
         error: rejectionReason,
-        validation: {
-          fileType: {
-            status: 'fail',
-            value: formatRejectedFileType(file.name),
-            issue: rejectionReason
-          }
-        }
+        validation
       };
     }
 

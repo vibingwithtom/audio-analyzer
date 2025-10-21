@@ -8,6 +8,7 @@
   import type { AudioResults } from '../types';
   import { exportResultsToCsv, exportResultsEnhanced, type ExportOptions } from '../utils/export-utils';
   import { formatDuration } from '../utils/format-utils';
+  import { computeExperimentalStatus } from '../utils/status-utils';
 
   // Props
   export let results: AudioResults | AudioResults[] | null = null;
@@ -33,7 +34,7 @@
   $: enrichedResults = batchResults.map(result => ({
     ...result,
     computedStatus: $analysisMode === 'experimental'
-      ? getExperimentalStatus(result)
+      ? computeExperimentalStatus(result)
       : result.status
   }));
 
@@ -54,108 +55,6 @@
         return r.status !== 'error' && r.computedStatus === $resultsFilter;
       });
 
-  // Helper function to get experimental metric status
-  function getExperimentalStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
-    const statuses: string[] = [];
-
-    // Check normalization
-    if (result.normalizationStatus) {
-      statuses.push(result.normalizationStatus.status === 'normalized' ? 'success' : 'warning');
-    }
-
-    // Check noise floor
-    if (result.noiseFloorDb !== undefined && result.noiseFloorDb !== -Infinity) {
-      if (result.noiseFloorDb <= -60) statuses.push('success');
-      else if (result.noiseFloorDb <= -50) statuses.push('warning');
-      else statuses.push('error');
-    }
-
-    // Check reverb
-    if (result.reverbInfo?.label) {
-      if (result.reverbInfo.label.includes('Excellent') || result.reverbInfo.label.includes('Good')) {
-        statuses.push('success');
-      } else if (result.reverbInfo.label.includes('Fair')) {
-        statuses.push('warning');
-      } else {
-        statuses.push('error');
-      }
-    }
-
-    // Check silence metrics
-    // Leading/Trailing: < 5s = success, 5-10s = warning, >= 10s = error
-    if (result.leadingSilence !== undefined) {
-      if (result.leadingSilence < 5) statuses.push('success');
-      else if (result.leadingSilence < 10) statuses.push('warning');
-      else statuses.push('error');
-    }
-    if (result.trailingSilence !== undefined) {
-      if (result.trailingSilence < 5) statuses.push('success');
-      else if (result.trailingSilence < 10) statuses.push('warning');
-      else statuses.push('error');
-    }
-    // Max silence gap: < 5s = success, 5-10s = warning, >= 10s = error
-    if (result.longestSilence !== undefined) {
-      if (result.longestSilence < 5) statuses.push('success');
-      else if (result.longestSilence < 10) statuses.push('warning');
-      else statuses.push('error');
-    }
-
-    // Check mic bleed
-    if (result.micBleed) {
-      const oldDetected = result.micBleed.old &&
-        (result.micBleed.old.leftChannelBleedDb > -60 || result.micBleed.old.rightChannelBleedDb > -60);
-      const newDetected = result.micBleed.new &&
-        (result.micBleed.new.percentageConfirmedBleed > 0.5);
-
-      if (oldDetected || newDetected) {
-        statuses.push('warning');
-      } else {
-        statuses.push('success');
-      }
-    }
-
-    // Check clipping analysis
-    if (result.clippingAnalysis) {
-      const { clippedPercentage, clippingEventCount, nearClippingPercentage } = result.clippingAnalysis;
-
-      // Hard clipping > 1% OR > 50 events → error
-      if (clippedPercentage > 1 || clippingEventCount > 50) {
-        statuses.push('error');
-      }
-      // Hard clipping 0.1-1% OR 10-50 events → warning
-      else if (clippedPercentage > 0.1 || clippingEventCount > 10) {
-        statuses.push('warning');
-      }
-      // Any hard clipping → warning
-      else if (clippedPercentage > 0 && clippingEventCount > 0) {
-        statuses.push('warning');
-      }
-      // Near clipping > 1% → warning
-      else if (nearClippingPercentage > 1) {
-        statuses.push('warning');
-      }
-      // All clear
-      else {
-        statuses.push('success');
-      }
-    }
-
-    // Check conversational audio metrics (only for conversational stereo)
-    if (result.conversationalAnalysis) {
-      // Check speech overlap
-      if (result.conversationalAnalysis.overlap) {
-        const overlapPct = result.conversationalAnalysis.overlap.overlapPercentage;
-        if (overlapPct < 5) statuses.push('success');
-        else if (overlapPct <= 15) statuses.push('warning');
-        else statuses.push('error');
-      }
-    }
-
-    // Determine worst status
-    if (statuses.includes('error')) return 'fail';
-    if (statuses.includes('warning')) return 'warning';
-    return 'pass';
-  }
 
   // Calculate batch statistics using enrichedResults for consistency
   $: passCount = enrichedResults.filter(r =>
@@ -923,9 +822,9 @@
       {#if !$currentPresetId?.startsWith('auditions-') && !$isSimplifiedMode}
         {#if $analysisMode === 'experimental'}
           <div class="mode-switcher">
-            💡 Want to see basic file properties? Switch to
-            <a href="#" on:click|preventDefault={() => setAnalysisMode('audio-only')}>
-              Audio Analysis
+            💡 Want to check just filenames without analyzing audio? Switch to
+            <a href="#" on:click|preventDefault={() => setAnalysisMode('filename-only')}>
+              Filename-Only
             </a> mode
           </div>
         {:else if $analysisMode === 'audio-only'}
@@ -969,9 +868,9 @@
       {#if !$currentPresetId?.startsWith('auditions-') && !$isSimplifiedMode}
         {#if $analysisMode === 'experimental'}
           <div class="mode-switcher">
-            💡 Want to see basic file properties? Switch to
-            <a href="#" on:click|preventDefault={() => setAnalysisMode('audio-only')}>
-              Audio Analysis
+            💡 Want to check just filenames without analyzing audio? Switch to
+            <a href="#" on:click|preventDefault={() => setAnalysisMode('filename-only')}>
+              Filename-Only
             </a> mode
           </div>
         {:else if $analysisMode === 'audio-only'}

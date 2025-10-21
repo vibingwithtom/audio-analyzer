@@ -14,6 +14,7 @@
   import { analyticsService } from '../services/analytics-service';
   import { AnalysisCancelledError } from '@audio-analyzer/core';
   import { cancelCurrentAnalysis } from '../services/audio-analysis-service';
+  import { FilenameValidator } from '../validation/filename-validator';
 
   let analysisProgress = $state({
     visible: false,
@@ -246,6 +247,29 @@
           externalUrl = `https://drive.google.com/file/d/${originalFileId}/view`;
         }
 
+        // Build validation object
+        const validation: any = {
+          fileType: {
+            status: 'fail',
+            value: formatRejectedFileType(file.name),
+            issue: rejectionReason
+          }
+        };
+
+        // Add filename validation if preset supports it and we're in filename-only mode
+        const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+        if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+          if (preset.filenameValidationType === 'bilingual-pattern') {
+            const filenameValidation = FilenameValidator.validateBilingual(file.name);
+            validation.filename = {
+              status: filenameValidation.status,
+              value: file.name,
+              issue: filenameValidation.issue
+            };
+          }
+          // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+        }
+
         results = {
           filename: file.name,
           fileType: formatRejectedFileType(file.name),
@@ -256,13 +280,7 @@
           duration: 0,
           status: 'fail',
           error: rejectionReason,
-          validation: {
-            fileType: {
-              status: 'fail',
-              value: formatRejectedFileType(file.name),
-              issue: rejectionReason
-            }
-          },
+          validation,
           externalUrl
         };
         resultsMode = $analysisMode;
@@ -344,8 +362,6 @@
     const concurrency = 3; // Process 3 files at once
     let index = 0;
     const inProgress: Map<number, Promise<void>> = new Map();
-    const tempResults: AudioResults[] = []; // Accumulate results here
-    const UI_UPDATE_INTERVAL = 5; // Update UI every 5 results to reduce re-renders
 
     try {
       while (index < driveFiles.length || inProgress.size > 0) {
@@ -369,6 +385,30 @@
               // Validate file type against current preset criteria
               if (!isFileTypeAllowed(driveFile.name, $currentCriteria)) {
                 const rejectionReason = getFileRejectionReason(driveFile.name, $currentCriteria);
+
+                // Build validation object
+                const validation: any = {
+                  fileType: {
+                    status: 'fail',
+                    value: formatRejectedFileType(driveFile.name),
+                    issue: rejectionReason
+                  }
+                };
+
+                // Add filename validation if preset supports it and we're in filename-only mode
+                const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+                if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+                  if (preset.filenameValidationType === 'bilingual-pattern') {
+                    const filenameValidation = FilenameValidator.validateBilingual(driveFile.name);
+                    validation.filename = {
+                      status: filenameValidation.status,
+                      value: driveFile.name,
+                      issue: filenameValidation.issue
+                    };
+                  }
+                  // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+                }
+
                 // Create failed result
                 const failedResult: AudioResults = {
                   filename: driveFile.name,
@@ -380,22 +420,10 @@
                   duration: 0,
                   status: 'fail',
                   error: rejectionReason,
-                  validation: {
-                    fileType: {
-                      status: 'fail',
-                      value: formatRejectedFileType(driveFile.name),
-                      issue: rejectionReason
-                    }
-                  }
+                  validation
                 };
-                tempResults.push(failedResult);
-
-                // Batch UI updates to reduce re-renders
-                if (tempResults.length >= UI_UPDATE_INTERVAL) {
-                  batchResults = [...batchResults, ...tempResults];
-                  processedFiles = batchResults.length;
-                  tempResults.length = 0; // Clear temp array
-                }
+                batchResults = [...batchResults, failedResult];
+                processedFiles = batchResults.length;
                 return;
               }
 
@@ -421,15 +449,9 @@
               // Add external URL for Google Drive files
               result.externalUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
 
-              // Add to temp results
-              tempResults.push(result);
-
-              // Batch UI updates to reduce re-renders
-              if (tempResults.length >= UI_UPDATE_INTERVAL) {
-                batchResults = [...batchResults, ...tempResults];
-                processedFiles = batchResults.length;
-                tempResults.length = 0; // Clear temp array
-              }
+              // Add to results immediately for smooth UI updates
+              batchResults = [...batchResults, result];
+              processedFiles = batchResults.length;
 
               // If this was the currently displayed file, clear it so next file can be shown
               if (currentDisplayedFile === driveFile.name) {
@@ -459,14 +481,8 @@
                 status: 'error',
                 error: err instanceof Error ? err.message : 'Unknown error'
               };
-              tempResults.push(errorResult);
-
-              // Batch UI updates to reduce re-renders
-              if (tempResults.length >= UI_UPDATE_INTERVAL) {
-                batchResults = [...batchResults, ...tempResults];
-                processedFiles = batchResults.length;
-                tempResults.length = 0; // Clear temp array
-              }
+              batchResults = [...batchResults, errorResult];
+              processedFiles = batchResults.length;
             } finally {
               // Remove this task from inProgress when complete
               inProgress.delete(taskId);
@@ -480,13 +496,6 @@
         if (inProgress.size > 0) {
           await Promise.race(Array.from(inProgress.values()));
         }
-      }
-
-      // Flush any remaining temp results
-      if (tempResults.length > 0) {
-        batchResults = [...batchResults, ...tempResults];
-        processedFiles = batchResults.length;
-        tempResults.length = 0;
       }
 
     } catch (err) {
@@ -715,6 +724,30 @@
             const rejectionReason = getFileRejectionReason(fileMetadata.name, $currentCriteria);
             // Set error and failed result WITHOUT downloading
             error = rejectionReason;
+
+            // Build validation object
+            const validation: any = {
+              fileType: {
+                status: 'fail',
+                value: formatRejectedFileType(fileMetadata.name),
+                issue: rejectionReason
+              }
+            };
+
+            // Add filename validation if preset supports it and we're in filename-only mode
+            const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+            if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+              if (preset.filenameValidationType === 'bilingual-pattern') {
+                const filenameValidation = FilenameValidator.validateBilingual(fileMetadata.name);
+                validation.filename = {
+                  status: filenameValidation.status,
+                  value: fileMetadata.name,
+                  issue: filenameValidation.issue
+                };
+              }
+              // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+            }
+
             results = {
               filename: fileMetadata.name,
               fileType: formatRejectedFileType(fileMetadata.name),
@@ -725,13 +758,7 @@
               duration: 0,
               status: 'fail',
               error: rejectionReason,
-              validation: {
-                fileType: {
-                  status: 'fail',
-                  value: formatRejectedFileType(fileMetadata.name),
-                  issue: rejectionReason
-                }
-              },
+              validation,
               externalUrl: `https://drive.google.com/file/d/${fileMetadata.id}/view`
             };
             resultsMode = $analysisMode;
@@ -768,6 +795,30 @@
           const rejectionReason = getFileRejectionReason(metadata.name, $currentCriteria);
           // Set error and failed result WITHOUT downloading
           error = rejectionReason;
+
+          // Build validation object
+          const validation: any = {
+            fileType: {
+              status: 'fail',
+              value: formatRejectedFileType(metadata.name),
+              issue: rejectionReason
+            }
+          };
+
+          // Add filename validation if preset supports it and we're in filename-only mode
+          const preset = $currentPresetId ? availablePresets[$currentPresetId] : null;
+          if (preset?.filenameValidationType && $analysisMode === 'filename-only') {
+            if (preset.filenameValidationType === 'bilingual-pattern') {
+              const filenameValidation = FilenameValidator.validateBilingual(metadata.name);
+              validation.filename = {
+                status: filenameValidation.status,
+                value: metadata.name,
+                issue: filenameValidation.issue
+              };
+            }
+            // Note: Three Hour validation requires scriptsList/speakerId which aren't available here
+          }
+
           results = {
             filename: metadata.name,
             fileType: formatRejectedFileType(metadata.name),
@@ -778,13 +829,7 @@
             duration: 0,
             status: 'fail',
             error: rejectionReason,
-            validation: {
-              fileType: {
-                status: 'fail',
-                value: formatRejectedFileType(metadata.name),
-                issue: rejectionReason
-              }
-            },
+            validation,
             externalUrl: originalFileUrl
           };
           resultsMode = $analysisMode;

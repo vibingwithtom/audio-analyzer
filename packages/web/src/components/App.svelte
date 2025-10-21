@@ -157,7 +157,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 0 1.5rem;
   }
@@ -216,7 +216,7 @@
   }
 
   .container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 0 1.5rem;
   }

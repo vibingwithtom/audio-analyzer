@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 🚨 STOP! READ THIS FIRST 🚨
 **Before writing ANY code, ALWAYS:**
 1. ✅ Check current branch: `git branch --show-current`
-2. ✅ If on `main`, STOP and create feature branch: `git checkout -b feature/descriptive-name`
+2. ✅ If on `main` or `staging`, STOP and create feature branch: `git checkout -b feature/descriptive-name`
 3. ✅ Only then proceed with coding
 
-**NO EXCEPTIONS. This prevents production breakage.**
+**NO EXCEPTIONS. Features go to staging first, then main as a batch.**
 ---
 
 ## ⚠️ CRITICAL: Development Workflow Rules
@@ -33,38 +33,66 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Check `packages/web/tests/unit/` for relevant test files
 - Update mocks in `beforeEach` blocks to include new methods
 
-### Standard Workflow (Use This Every Time)
+### Standard Workflow - Staging Branch (Use This Every Time)
+
+**We use a staging branch to batch changes together before production deployment.**
+
 ```bash
 # 1. Create feature branch
+git checkout main && git pull origin main
 git checkout -b feature/descriptive-name
 
 # 2. Develop and test locally
-npm run dev                  # Test in browser
+npm run dev                  # Test in browser (Google Drive now works on localhost!)
 npm test                     # Run tests locally
 
-# 3. Commit and push (triggers CI automatically)
+# 3. Commit and push feature branch
 git add .
 git commit -m "feat: description"
 git push origin feature/descriptive-name
 
-# 4. Deploy to beta for manual testing (optional but recommended)
+# 4. Merge to staging (NOT main) for integration testing
+git checkout staging
+git pull origin staging      # Get latest staging
+git merge feature/descriptive-name
+git push origin staging
+
+# 5. Deploy staging to beta for testing ALL changes together
 cd packages/web
 npm run deploy:beta
 # Test at: https://audio-analyzer.tinytech.site/beta/
+# Verify your feature works WITH other staged features
 
-# 5. Create Pull Request (REQUIRED for main branch)
-gh pr create --base main --head feature/descriptive-name
+# 6. Once all features are ready, create ONE PR from staging to main
+gh pr create --base main --head staging --title "Release: [describe batch of features]"
 
-# 6. WAIT for Claude Code Review to complete
+# 7. WAIT for Claude Code Review and CI to complete
 # ⚠️ CRITICAL: Always wait for the Claude bot review to finish
 # - Check PR status: gh pr view <PR_NUMBER>
 # - Look for "Claude Code Review" check to show SUCCESS
-# - Review any findings or suggestions from the bot
-# - Only proceed to merge after review is complete and passing
+# - CI must pass (all 768+ tests)
 
-# 7. Merge PR after CI and Claude review pass
+# 8. Merge staging → main (triggers ONE production deployment)
 # Production auto-deploys after merge to main
+
+# 9. After successful deployment, recreate staging from main
+git checkout main && git pull origin main
+git branch -D staging        # Delete old staging
+git checkout -b staging      # Fresh staging for next batch
+git push origin staging --force
 ```
+
+#### Why Staging?
+- **Batch deployments**: Multiple features go to production together
+- **Integration testing**: Catch conflicts between features in beta BEFORE production
+- **Single deploy event**: Less disruption for users
+- **Easy rollback**: One PR to revert if issues arise
+
+#### Working with Long-Running Features
+If you need to pause work on a large feature:
+- Keep it on its feature branch (don't merge to staging)
+- Work on urgent fixes separately
+- Only merge to staging when ready to deploy
 
 ### Why These Rules Exist
 In October 2024, a feature branch was merged to main without running tests. The production deployment failed because:
