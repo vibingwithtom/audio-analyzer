@@ -2,6 +2,24 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
 import { afterEach, vi, beforeAll } from 'vitest';
 
+// Fix document.createElement returning plain objects in CI
+// Store the original createElement before anything can override it
+const originalCreateElement = document.createElement.bind(document);
+if (typeof document.createElement !== 'function' ||
+    !document.createElement('div').appendChild) {
+  // @ts-ignore - Fix broken createElement
+  document.createElement = function(tagName: string, options?: any) {
+    const element = originalCreateElement(tagName, options);
+    // If the element doesn't have appendChild, it's broken - need to fix
+    if (!element.appendChild && document.body.appendChild) {
+      // Clone methods from body which does work
+      const proto = Object.getPrototypeOf(document.body);
+      Object.setPrototypeOf(element, proto);
+    }
+    return element;
+  };
+}
+
 // Polyfill document.createTextNode for CI jsdom environment
 // CI's jsdom is missing this critical API that Svelte's legacy-client needs
 if (typeof document !== 'undefined' && typeof document.createTextNode !== 'function') {
