@@ -16,11 +16,23 @@ console.log('[SETUP] Initial div constructor:', testDiv.constructor.name);
 document.createElement = function(tagName: string, options?: any) {
   const element = originalCreateElement.call(document, tagName, options);
 
-  // If element lacks appendChild, copy prototype from body which works
+  // If element lacks appendChild, manually add DOM methods from body
   if (!element.appendChild && document.body.appendChild) {
     console.log('[CREATEELEMENT] Fixing broken element:', tagName);
-    const proto = Object.getPrototypeOf(document.body);
-    Object.setPrototypeOf(element, proto);
+
+    // Prototype copying doesn't work, so manually add each required method
+    element.appendChild = document.body.appendChild.bind(element);
+    element.removeChild = document.body.removeChild.bind(element);
+    element.insertBefore = document.body.insertBefore.bind(element);
+    element.replaceChild = document.body.replaceChild?.bind(element);
+    element.cloneNode = document.body.cloneNode.bind(element);
+    element.contains = document.body.contains.bind(element);
+
+    // Add missing properties
+    if (!element.childNodes) element.childNodes = [];
+    if (!element.children) element.children = [];
+    if (element.nodeType === undefined) element.nodeType = 1; // ELEMENT_NODE
+    if (!element.ownerDocument) element.ownerDocument = document;
   }
 
   return element;
