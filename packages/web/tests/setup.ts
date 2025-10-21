@@ -1,6 +1,21 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
-import { afterEach, vi } from 'vitest';
+import { afterEach, vi, beforeAll } from 'vitest';
+
+// Mock Svelte lifecycle functions for testing
+beforeAll(() => {
+  vi.mock('svelte', async () => {
+    const actual = await vi.importActual('svelte');
+    return {
+      ...actual,
+      onMount: vi.fn((fn) => fn()),
+      onDestroy: vi.fn(),
+      mount: vi.fn(),
+      beforeUpdate: vi.fn(),
+      afterUpdate: vi.fn()
+    };
+  });
+});
 
 // Cleanup after each test
 afterEach(() => {

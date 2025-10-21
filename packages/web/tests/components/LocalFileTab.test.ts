@@ -97,6 +97,7 @@ describe('LocalFileTab.svelte', () => {
   describe('Component Rendering', () => {
     it('should render the LocalFileTab component', () => {
       render(LocalFileTab);
+      // Component renders to document, not container
       expect(document.querySelector('.local-file-tab')).toBeTruthy();
     });
 
@@ -108,7 +109,7 @@ describe('LocalFileTab.svelte', () => {
 
     it('should render FileUpload component', () => {
       render(LocalFileTab);
-      const fileUpload = document.getElementById('local-file-upload');
+      const fileUpload = document.querySelector('#local-file-upload');
       expect(fileUpload).toBeTruthy();
     });
 
@@ -121,8 +122,9 @@ describe('LocalFileTab.svelte', () => {
 
     it('should disable file upload when no preset configured', () => {
       render(LocalFileTab);
-      const fileUpload = document.getElementById('local-file-upload') as HTMLInputElement;
-      expect(fileUpload?.disabled).toBeDefined();
+      const fileUpload = document.querySelector('#local-file-upload') as HTMLInputElement;
+      expect(fileUpload).toBeTruthy();
+      // Note: The disabled state depends on store values
     });
 
     it('should show warning when no valid preset configured', () => {

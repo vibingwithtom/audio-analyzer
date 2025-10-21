@@ -7,14 +7,19 @@ export default defineConfig({
     svelte({
       hot: !process.env.VITEST,
       compilerOptions: {
-        dev: true
+        dev: true,
+        compatibility: {
+          componentApi: 4  // Enable Svelte 4 component API for testing
+        }
       }
     })
   ],
-  ssr: {
-    noExternal: ['svelte']
-  },
   test: {
+    // Transform @testing-library/svelte despite being in node_modules
+    transformMode: {
+      ssr: ['/node_modules/@testing-library/svelte/'],
+      web: ['/src/', '/tests/']
+    },
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
