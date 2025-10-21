@@ -3,34 +3,35 @@ import { cleanup } from '@testing-library/svelte';
 import { afterEach, vi, beforeAll } from 'vitest';
 
 // Fix document.createElement returning plain objects in CI
-// This needs to wrap createElement to fix every element created
+// Something (Svelte plugin?) breaks createElement AFTER setup runs
+// We need to ALWAYS wrap it to protect against this
 const originalCreateElement = document.createElement;
 const testDiv = originalCreateElement.call(document, 'div');
-const needsFix = !testDiv.appendChild;
 
-console.log('[SETUP] createElement needs fix:', needsFix);
-console.log('[SETUP] Test div constructor:', testDiv.constructor.name);
+console.log('[SETUP] Initial createElement working:', !!testDiv.appendChild);
+console.log('[SETUP] Initial div constructor:', testDiv.constructor.name);
 
-if (needsFix) {
-  // @ts-ignore - Override createElement to fix all elements
-  document.createElement = function(tagName: string, options?: any) {
-    const element = originalCreateElement.call(document, tagName, options);
+// ALWAYS wrap createElement to protect against later breakage
+// @ts-ignore - Override createElement to ensure all elements work
+document.createElement = function(tagName: string, options?: any) {
+  const element = originalCreateElement.call(document, tagName, options);
 
-    // If element lacks appendChild, copy prototype from body
-    if (!element.appendChild && document.body.appendChild) {
-      console.log('[SETUP] Fixing element:', tagName);
-      const proto = Object.getPrototypeOf(document.body);
-      Object.setPrototypeOf(element, proto);
-    }
+  // If element lacks appendChild, copy prototype from body which works
+  if (!element.appendChild && document.body.appendChild) {
+    console.log('[CREATEELEMENT] Fixing broken element:', tagName);
+    const proto = Object.getPrototypeOf(document.body);
+    Object.setPrototypeOf(element, proto);
+  }
 
-    return element;
-  };
+  return element;
+};
 
-  // Test the fix
-  const fixedDiv = document.createElement('div');
-  console.log('[SETUP] After fix - div.appendChild exists:', typeof fixedDiv.appendChild === 'function');
-  console.log('[SETUP] After fix - div constructor:', fixedDiv.constructor.name);
-}
+console.log('[SETUP] createElement wrapper installed');
+
+// Test the wrapper
+const wrappedDiv = document.createElement('div');
+console.log('[SETUP] Wrapped div.appendChild exists:', typeof wrappedDiv.appendChild === 'function');
+console.log('[SETUP] Wrapped div constructor:', wrappedDiv.constructor.name);
 
 // Polyfill document.createTextNode for CI jsdom environment
 // CI's jsdom is missing this critical API that Svelte's legacy-client needs
