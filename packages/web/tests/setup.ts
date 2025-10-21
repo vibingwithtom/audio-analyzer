@@ -3,21 +3,33 @@ import { cleanup } from '@testing-library/svelte';
 import { afterEach, vi, beforeAll } from 'vitest';
 
 // Fix document.createElement returning plain objects in CI
-// Store the original createElement before anything can override it
-const originalCreateElement = document.createElement.bind(document);
-if (typeof document.createElement !== 'function' ||
-    !document.createElement('div').appendChild) {
-  // @ts-ignore - Fix broken createElement
+// This needs to wrap createElement to fix every element created
+const originalCreateElement = document.createElement;
+const testDiv = originalCreateElement.call(document, 'div');
+const needsFix = !testDiv.appendChild;
+
+console.log('[SETUP] createElement needs fix:', needsFix);
+console.log('[SETUP] Test div constructor:', testDiv.constructor.name);
+
+if (needsFix) {
+  // @ts-ignore - Override createElement to fix all elements
   document.createElement = function(tagName: string, options?: any) {
-    const element = originalCreateElement(tagName, options);
-    // If the element doesn't have appendChild, it's broken - need to fix
+    const element = originalCreateElement.call(document, tagName, options);
+
+    // If element lacks appendChild, copy prototype from body
     if (!element.appendChild && document.body.appendChild) {
-      // Clone methods from body which does work
+      console.log('[SETUP] Fixing element:', tagName);
       const proto = Object.getPrototypeOf(document.body);
       Object.setPrototypeOf(element, proto);
     }
+
     return element;
   };
+
+  // Test the fix
+  const fixedDiv = document.createElement('div');
+  console.log('[SETUP] After fix - div.appendChild exists:', typeof fixedDiv.appendChild === 'function');
+  console.log('[SETUP] After fix - div constructor:', fixedDiv.constructor.name);
 }
 
 // Polyfill document.createTextNode for CI jsdom environment
