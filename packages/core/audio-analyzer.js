@@ -232,7 +232,8 @@ export class AudioAnalyzer {
 
       throw new Error('fmt chunk not found');
     } catch (error) {
-      console.error('Error parsing WAV headers:', error);
+      // Silently handle parsing failures - misnamed files (e.g., M4A with .wav extension)
+      // are detected and processed correctly by detectFileTypeFromHeader() and Web Audio API
       return {
         sampleRate: 'Unknown',
         channels: 'Unknown',
