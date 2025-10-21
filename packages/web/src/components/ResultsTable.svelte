@@ -34,6 +34,7 @@
   let hasHorizontalScroll = $state(false);
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
+  let isFullscreen = $state(false);
 
   // Lazy blob URL management - create on-demand to prevent memory buildup
   const blobUrlCache = new Map<string, string>(); // filename -> blob URL
@@ -86,10 +87,23 @@
     });
   }
 
+  // Fullscreen toggle
+  function toggleFullscreen() {
+    isFullscreen = !isFullscreen;
+  }
+
+  // Handle ESC key to exit fullscreen
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && isFullscreen) {
+      isFullscreen = false;
+    }
+  }
+
   // Check scroll on mount and when results change
   onMount(() => {
     checkScroll();
     window.addEventListener('resize', checkScroll);
+    window.addEventListener('keydown', handleKeydown);
 
     // Listen for scroll events to update button states
     if (tableWrapper) {
@@ -98,6 +112,7 @@
 
     return () => {
       window.removeEventListener('resize', checkScroll);
+      window.removeEventListener('keydown', handleKeydown);
       if (tableWrapper) {
         tableWrapper.removeEventListener('scroll', checkScroll);
       }
@@ -464,6 +479,56 @@
     position: relative;
   }
 
+  /* Fullscreen mode */
+  .experimental-table-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: var(--bg-primary, #ffffff);
+    padding: 1rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .experimental-table-container.fullscreen .experimental-table-wrapper {
+    flex: 1;
+    overflow: auto;
+  }
+
+  /* Table toolbar with expand button */
+  .table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .expand-button {
+    background: var(--bg-secondary, #f5f5f5);
+    border: 1px solid var(--bg-tertiary, #e0e0e0);
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+  }
+
+  .expand-button:hover {
+    background: var(--bg-tertiary, #e0e0e0);
+    transform: scale(1.05);
+  }
+
+  .expand-button:active {
+    transform: scale(0.95);
+  }
+
   /* Experimental table should be scrollable horizontally if needed */
   .experimental-table-wrapper {
     overflow-x: auto;
@@ -594,7 +659,18 @@
 <div class="results-container">
   {#if experimentalMode}
     <!-- EXPERIMENTAL MODE TABLE -->
-    <div class="experimental-table-container">
+    <div class="experimental-table-container" class:fullscreen={isFullscreen}>
+      <!-- Table header with expand button -->
+      <div class="table-toolbar">
+        <button
+          class="expand-button"
+          onclick={toggleFullscreen}
+          aria-label="Toggle fullscreen"
+          title="Expand table to fullscreen (ESC to exit)"
+        >
+          {isFullscreen ? '⊗' : '⛶'}
+        </button>
+      </div>
       <div class="experimental-table-wrapper" bind:this={tableWrapper}>
         <table class="results-table">
         <thead>
