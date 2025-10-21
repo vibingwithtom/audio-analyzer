@@ -11,6 +11,20 @@ describe('CI Debug', () => {
     console.log('Text constructor exists:', typeof Text !== 'undefined');
     console.log('document.createTextNode exists:', typeof document?.createTextNode === 'function');
     console.log('document.createElement exists:', typeof document?.createElement === 'function');
+    console.log('document.body exists:', typeof document?.body !== 'undefined');
+
+    // Test DOM element creation
+    if (typeof document !== 'undefined') {
+      const div = document.createElement('div');
+      console.log('div created:', !!div);
+      console.log('div.appendChild exists:', typeof div.appendChild === 'function');
+      console.log('div.removeChild exists:', typeof div.removeChild === 'function');
+      console.log('div.insertBefore exists:', typeof div.insertBefore === 'function');
+      console.log('div constructor:', div.constructor.name);
+
+      // Test if we can append to body
+      console.log('document.body.appendChild exists:', typeof document.body?.appendChild === 'function');
+    }
 
     // Test createTextNode polyfill works
     if (typeof document !== 'undefined' && document.createTextNode) {
