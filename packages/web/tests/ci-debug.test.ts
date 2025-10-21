@@ -7,6 +7,9 @@ describe('CI Debug', () => {
     console.log('Arch:', process.arch);
     console.log('CWD:', process.cwd());
     console.log('Env VITEST:', process.env.VITEST);
+    console.log('document exists:', typeof document !== 'undefined');
+    console.log('document.createTextNode exists:', typeof document?.createTextNode === 'function');
+    console.log('document.createElement exists:', typeof document?.createElement === 'function');
     expect(true).toBe(true);
   });
 });
