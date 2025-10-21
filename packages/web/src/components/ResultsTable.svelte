@@ -101,22 +101,26 @@
 
   // Check scroll on mount and when results change
   onMount(() => {
-    checkScroll();
     window.addEventListener('resize', checkScroll);
     window.addEventListener('keydown', handleKeydown);
-
-    // Listen for scroll events to update button states
-    if (tableWrapper) {
-      tableWrapper.addEventListener('scroll', checkScroll);
-    }
 
     return () => {
       window.removeEventListener('resize', checkScroll);
       window.removeEventListener('keydown', handleKeydown);
-      if (tableWrapper) {
-        tableWrapper.removeEventListener('scroll', checkScroll);
-      }
     };
+  });
+
+  // Set up scroll listener when tableWrapper is bound (using $effect for reactivity)
+  $effect(() => {
+    if (tableWrapper) {
+      checkScroll(); // Initial check
+      const handleScroll = () => checkScroll();
+      tableWrapper.addEventListener('scroll', handleScroll);
+
+      return () => {
+        tableWrapper.removeEventListener('scroll', handleScroll);
+      };
+    }
   });
 
   // Recheck scroll when results change
@@ -476,7 +480,7 @@
 
   /* Container for experimental table with gradient overlay */
   .experimental-table-container {
-    position: relative;
+    /* No overflow or positioning - just container for toolbar and table */
   }
 
   /* Fullscreen mode */
@@ -491,14 +495,24 @@
     z-index: 9999;
     background: var(--bg-primary, #ffffff);
     padding: 1rem;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  .experimental-table-container.fullscreen .experimental-table-wrapper {
+  .experimental-table-container.fullscreen .table-with-controls {
     flex: 1;
+    overflow: hidden;
+  }
+
+  .experimental-table-container.fullscreen .experimental-table-wrapper {
+    height: 100%;
     overflow: auto;
+  }
+
+  /* Wrapper for table + scroll controls - clips buttons at table boundaries */
+  .table-with-controls {
+    position: relative;
+    overflow: hidden; /* Clips buttons and shadow at table boundaries, not container boundaries */
   }
 
   /* Table toolbar with expand button */
@@ -673,8 +687,10 @@
           {isFullscreen ? '⊗' : '⛶'}
         </button>
       </div>
-      <div class="experimental-table-wrapper" bind:this={tableWrapper}>
-        <table class="results-table">
+      <!-- Wrapper for table + scroll controls (clips buttons at table boundaries) -->
+      <div class="table-with-controls">
+        <div class="experimental-table-wrapper" bind:this={tableWrapper}>
+          <table class="results-table">
         <thead>
           <tr>
             <th>Filename</th>
@@ -708,19 +724,19 @@
               </td>
               <!-- File Type column -->
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444;">--</span>
-                {:else if result.fileType}
-                  <span style="color: {result.validation?.fileType?.status === 'warning' ? '#ff9800' : '#4caf50'};">
-                    {result.fileType}
+                {#if result.fileType}
+                  <span style="color: {result.validation?.fileType?.status === 'fail' ? '#ef4444' : result.validation?.fileType?.status === 'warning' ? '#ff9800' : '#4caf50'};">
+                    {result.fileType.toUpperCase()}
                   </span>
                 {:else}
-                  N/A
+                  <span style="color: #ef4444;">Unknown</span>
                 {/if}
               </td>
               <!-- Sample Rate column -->
               <td>
-                {#if result.sampleRate !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.sampleRate !== undefined}
                   <span style="color: {result.validation?.sampleRate?.status === 'fail' ? '#ef4444' : result.validation?.sampleRate?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatSampleRate(result.sampleRate)}
                   </span>
@@ -730,7 +746,9 @@
               </td>
               <!-- Bit Depth column -->
               <td>
-                {#if result.bitDepth !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.bitDepth !== undefined}
                   <span style="color: {result.validation?.bitDepth?.status === 'fail' ? '#ef4444' : result.validation?.bitDepth?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatBitDepth(result.bitDepth)}
                   </span>
@@ -740,7 +758,9 @@
               </td>
               <!-- Channels column -->
               <td>
-                {#if result.channels !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.channels !== undefined}
                   <span style="color: {result.validation?.channels?.status === 'fail' ? '#ef4444' : result.validation?.channels?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatChannels(result.channels)}
                   </span>
@@ -750,7 +770,9 @@
               </td>
               <!-- Duration column -->
               <td>
-                {#if result.duration !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  <span style="color: #ef4444;">--</span>
+                {:else if result.duration !== undefined}
                   <span style="color: {result.validation?.duration?.status === 'fail' ? '#ef4444' : result.validation?.duration?.status === 'warning' ? '#ff9800' : '#4caf50'};">
                     {formatDuration(result.duration)}
                   </span>
@@ -1106,9 +1128,9 @@
         </tbody>
       </table>
     </div>
-    <!-- Shadow gradient overlay - stays fixed at right edge -->
+    <!-- Shadow gradient overlay - positioned relative to table-with-controls wrapper -->
     <div class="scroll-shadow" class:visible={hasHorizontalScroll}></div>
-    <!-- Scroll buttons -->
+    <!-- Scroll buttons - positioned relative to table-with-controls wrapper so they don't scroll with content -->
     <button
       class="scroll-button left"
       class:visible={canScrollLeft}
@@ -1125,6 +1147,7 @@
     >
       ▶
     </button>
+  </div>
   </div>
   {:else}
     <!-- STANDARD MODE TABLE -->
