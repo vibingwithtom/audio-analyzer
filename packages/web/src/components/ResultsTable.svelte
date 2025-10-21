@@ -696,11 +696,7 @@
             {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
               <td>
-                {#if result.validation?.fileType?.status === 'fail'}
-                  <span style="color: #ef4444; font-weight: 500;">{result.filename}</span>
-                {:else}
-                  {result.filename}
-                {/if}
+                {result.filename}
               </td>
               <!-- Status column -->
               <td>
