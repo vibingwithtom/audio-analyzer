@@ -8,6 +8,7 @@ describe('CI Debug', () => {
     console.log('CWD:', process.cwd());
     console.log('Env VITEST:', process.env.VITEST);
     console.log('document exists:', typeof document !== 'undefined');
+    console.log('Text constructor exists:', typeof Text !== 'undefined');
     console.log('document.createTextNode exists:', typeof document?.createTextNode === 'function');
     console.log('document.createElement exists:', typeof document?.createElement === 'function');
 
@@ -16,6 +17,7 @@ describe('CI Debug', () => {
       const textNode = document.createTextNode('test');
       console.log('createTextNode test - nodeType:', textNode.nodeType);
       console.log('createTextNode test - textContent:', textNode.textContent);
+      console.log('createTextNode test - constructor:', textNode.constructor.name);
       expect(textNode.nodeType).toBe(3);
       expect(textNode.textContent).toBe('test');
     }

@@ -5,16 +5,39 @@ import { afterEach, vi, beforeAll } from 'vitest';
 // Polyfill document.createTextNode for CI jsdom environment
 // CI's jsdom is missing this critical API that Svelte's legacy-client needs
 if (typeof document !== 'undefined' && typeof document.createTextNode !== 'function') {
-  // @ts-ignore - Polyfill missing jsdom API
-  document.createTextNode = function(data: string) {
-    const text = document.createElement('text') as any;
-    text.nodeType = 3; // TEXT_NODE
-    text.nodeName = '#text';
-    text.nodeValue = data;
-    text.textContent = data;
-    text.data = data;
-    return text;
-  };
+  // Try to use the global Text constructor if available (proper way)
+  if (typeof Text !== 'undefined') {
+    // @ts-ignore - Polyfill using native Text constructor
+    document.createTextNode = function(data: string) {
+      return new Text(data);
+    };
+  } else {
+    // Fallback: Create a minimal text node implementation
+    // @ts-ignore - Polyfill with custom implementation
+    document.createTextNode = function(data: string) {
+      return {
+        nodeType: 3,
+        nodeName: '#text',
+        nodeValue: data,
+        textContent: data,
+        data: data,
+        ownerDocument: document,
+        parentNode: null,
+        parentElement: null,
+        childNodes: [],
+        firstChild: null,
+        lastChild: null,
+        previousSibling: null,
+        nextSibling: null,
+        cloneNode: function() {
+          return document.createTextNode(data);
+        },
+        toString: function() {
+          return data;
+        }
+      };
+    };
+  }
 }
 
 // Mock Svelte lifecycle functions for testing
