@@ -9,13 +9,14 @@ import { afterEach, vi, beforeAll } from 'vitest';
 // Capture working DOM methods BEFORE anything can break them
 const originalCreateElement = document.createElement;
 const workingDiv = originalCreateElement.call(document, 'div');
+// Store unbound methods so we can bind them to different elements later
 const workingMethods = {
-  appendChild: workingDiv.appendChild?.bind(workingDiv),
-  removeChild: workingDiv.removeChild?.bind(workingDiv),
-  insertBefore: workingDiv.insertBefore?.bind(workingDiv),
-  replaceChild: workingDiv.replaceChild?.bind(workingDiv),
-  cloneNode: workingDiv.cloneNode?.bind(workingDiv),
-  contains: workingDiv.contains?.bind(workingDiv)
+  appendChild: workingDiv.appendChild,
+  removeChild: workingDiv.removeChild,
+  insertBefore: workingDiv.insertBefore,
+  replaceChild: workingDiv.replaceChild,
+  cloneNode: workingDiv.cloneNode,
+  contains: workingDiv.contains
 };
 
 console.log('[SETUP] Initial createElement working:', !!workingDiv.appendChild);
@@ -31,36 +32,24 @@ document.createElement = function(tagName: string, options?: any) {
   if (!element.appendChild) {
     console.log('[CREATEELEMENT] Fixing broken element:', tagName);
 
-    // Use the working methods we captured at setup time, binding to this element
+    // Directly bind the captured methods to this element
     if (workingMethods.appendChild) {
-      element.appendChild = function(node) {
-        return workingMethods.appendChild.call(element, node);
-      };
+      element.appendChild = workingMethods.appendChild.bind(element);
     }
     if (workingMethods.removeChild) {
-      element.removeChild = function(node) {
-        return workingMethods.removeChild.call(element, node);
-      };
+      element.removeChild = workingMethods.removeChild.bind(element);
     }
     if (workingMethods.insertBefore) {
-      element.insertBefore = function(node, ref) {
-        return workingMethods.insertBefore.call(element, node, ref);
-      };
+      element.insertBefore = workingMethods.insertBefore.bind(element);
     }
     if (workingMethods.replaceChild) {
-      element.replaceChild = function(newNode, oldNode) {
-        return workingMethods.replaceChild.call(element, newNode, oldNode);
-      };
+      element.replaceChild = workingMethods.replaceChild.bind(element);
     }
     if (workingMethods.cloneNode) {
-      element.cloneNode = function(deep) {
-        return workingMethods.cloneNode.call(element, deep);
-      };
+      element.cloneNode = workingMethods.cloneNode.bind(element);
     }
     if (workingMethods.contains) {
-      element.contains = function(node) {
-        return workingMethods.contains.call(element, node);
-      };
+      element.contains = workingMethods.contains.bind(element);
     }
 
     // Add missing properties
@@ -68,6 +57,8 @@ document.createElement = function(tagName: string, options?: any) {
     if (!element.children) element.children = [];
     if (element.nodeType === undefined) element.nodeType = 1; // ELEMENT_NODE
     if (!element.ownerDocument) element.ownerDocument = document;
+
+    console.log('[CREATEELEMENT] Fixed - appendChild exists:', !!element.appendChild);
   }
 
   return element;
