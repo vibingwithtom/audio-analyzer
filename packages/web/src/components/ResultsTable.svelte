@@ -742,17 +742,21 @@
                   N/A
                 {/if}
               </td>
+              <!-- Peak Level -->
               <td>
-                {#if result.peakDb !== undefined}
-                  {result.peakDb.toFixed(1)} dB
-                {:else if result.status === 'fail' || result.status === 'error'}
+                {#if result.validation?.fileType?.status === 'fail'}
                   --
+                {:else if result.peakDb !== undefined}
+                  {result.peakDb.toFixed(1)} dB
                 {:else}
                   N/A
                 {/if}
               </td>
+              <!-- Normalization -->
               <td>
-                {#if result.normalizationStatus}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.normalizationStatus}
                   <span class="value-{getNormalizationClass(result.normalizationStatus)}">
                     {result.normalizationStatus.message || 'N/A'}
                   </span>
@@ -766,8 +770,6 @@
                       <span class="subtitle">{distance.toFixed(1)} dB under target</span>
                     {/if}
                   {/if}
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -824,10 +826,10 @@
                   {#if severity.eventCount > 0}
                     <span class="subtitle">{severity.eventCount} event{severity.eventCount > 1 ? 's' : ''}</span>
                   {/if}
+                {:else if result.validation?.fileType?.status === 'fail'}
+                  --
                 {:else if result.peakDb !== undefined}
                   <span class="value-success">Not detected</span>
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
@@ -856,7 +858,9 @@
                   return tooltip;
                 })() : 'Noise floor analysis data not available'}
               >
-                {#if result.noiseFloorDb !== undefined}
+                {#if result.validation?.fileType?.status === 'fail'}
+                  --
+                {:else if result.noiseFloorDb !== undefined}
                   <span class="value-{getNoiseFloorClass(result.noiseFloorDb)}">
                     {result.noiseFloorDb === -Infinity ? '-∞' : result.noiseFloorDb.toFixed(1)} dB
                   </span>
@@ -880,8 +884,6 @@
                       {/if}
                     </span>
                   {/if}
-                {:else if result.status === 'fail' || result.status === 'error'}
-                  --
                 {:else}
                   N/A
                 {/if}
