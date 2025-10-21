@@ -62,21 +62,22 @@ function computeStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'err
   }
 
   // File passed validation - compute status from ALL metrics (basic + experimental)
-  const statuses: string[] = [];
+  // Collect all statuses and filter out undefined values
+  const statuses = [
+    // Basic property validations
+    result.validation?.sampleRate?.status,
+    result.validation?.bitDepth?.status,
+    result.validation?.channels?.status,
 
-  // Basic property validations
-  if (result.validation?.sampleRate?.status) statuses.push(result.validation.sampleRate.status);
-  if (result.validation?.bitDepth?.status) statuses.push(result.validation.bitDepth.status);
-  if (result.validation?.channels?.status) statuses.push(result.validation.channels.status);
+    // Quality metric statuses
+    result.normalizationStatus,
+    result.clippingAnalysis ? getClippingSeverity(result.clippingAnalysis).level : undefined,
+    result.noiseFloorDb !== undefined ? getNoiseFloorClass(result.noiseFloorDb) : undefined,
+    result.reverbInfo ? getReverbClass(result.reverbInfo.label) : undefined,
+    // ... etc for other metrics
+  ].filter(Boolean); // Remove undefined values
 
-  // Quality metric statuses
-  if (result.normalizationStatus) statuses.push(result.normalizationStatus);
-  if (result.clippingAnalysis) statuses.push(getClippingSeverity(result.clippingAnalysis).level);
-  if (result.noiseFloorDb !== undefined) statuses.push(getNoiseFloorClass(result.noiseFloorDb));
-  if (result.reverbInfo) statuses.push(getReverbClass(result.reverbInfo.label));
-  // ... etc for other metrics
-
-  // Return worst status
+  // Return worst status (priority: fail > warning > pass)
   if (statuses.some(s => s === 'fail' || s === 'error')) return 'fail';
   if (statuses.some(s => s === 'warning')) return 'warning';
   return 'pass';
