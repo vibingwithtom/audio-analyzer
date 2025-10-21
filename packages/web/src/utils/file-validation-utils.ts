@@ -47,7 +47,20 @@ export function getFileTypeDisplay(criteria: AudioCriteria | null): string {
  * @returns File extension in uppercase (e.g., "MP3", "WAV") or empty string if no extension
  */
 export function getFileExtension(filename: string): string {
-  const extension = filename.split('.').pop()?.toLowerCase() || '';
+  const parts = filename.split('.');
+
+  // No extension if fewer than 2 parts
+  if (parts.length < 2) {
+    return '';
+  }
+
+  // For hidden files (starting with dot), need at least 3 parts for an extension
+  // e.g., .hidden (2 parts, no ext) vs .hidden.txt (3 parts, has ext)
+  if (parts[0] === '' && parts.length < 3) {
+    return '';
+  }
+
+  const extension = parts.pop()?.toLowerCase() || '';
   return extension ? extension.toUpperCase() : '';
 }
 
