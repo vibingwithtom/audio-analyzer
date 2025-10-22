@@ -174,17 +174,11 @@
     }
   }
 
-  // Smart staleness detection - only mark stale if new mode needs data we don't have
+  // Staleness detection - require reprocessing on ANY mode change
   $effect(() => {
     if ((results || batchResults.length > 0) && resultsMode !== null) {
-      if ($analysisMode === resultsMode) {
-        resultsStale = false;
-      } else {
-        const currentPreset = availablePresets[$currentPresetId];
-        const currentResults = batchResults.length > 0 ? batchResults : results;
-        const isStale = areResultsStaleForMode(currentResults, $analysisMode, currentPreset);
-        resultsStale = isStale;
-      }
+      // Always mark as stale if mode changed - require full reprocessing for proper status updates
+      resultsStale = $analysisMode !== resultsMode;
     }
   });
 
