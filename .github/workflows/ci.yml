@@ -27,8 +27,9 @@ jobs:
         run: |
           # Workaround for npm ci platform-specific dependency issues
           # See: https://github.com/npm/cli/issues/4828
-          # Use --include=optional to ensure platform-specific packages install
-          npm ci --no-audit --include=optional || npm install --no-audit --include=optional
+          # Remove lockfile and use npm install to handle optional deps correctly
+          rm -f package-lock.json
+          npm install --no-audit
 
       - name: Run tests
         working-directory: ./packages/web
