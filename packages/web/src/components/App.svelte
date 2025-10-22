@@ -253,7 +253,7 @@
       <h1 class="logo">🎵 Audio Analyzer</h1>
       <button
         class="dark-mode-toggle"
-        on:click={toggleDarkMode}
+        onclick={toggleDarkMode}
         aria-label="Toggle dark mode"
       >
         <span class="light-icon">🌙</span>

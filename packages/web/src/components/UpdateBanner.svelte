@@ -1,11 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  export let visible: boolean = false;
-  export let onReload: () => void = () => {};
-  export let onDismiss: () => void = () => {};
+  let { visible = false, onReload = () => {}, onDismiss = () => {} } = $props();
 
-  let dismissed = false;
+  let dismissed = $state(false);
 
   onMount(() => {
     // Check if user already dismissed this session
@@ -22,7 +20,7 @@
     onDismiss();
   }
 
-  $: shouldShow = visible && !dismissed;
+  let shouldShow = $derived(visible && !dismissed);
 </script>
 
 {#if shouldShow}
@@ -38,10 +36,10 @@
         <span>A new version of Audio Analyzer is available. Reload to get the latest features and fixes.</span>
       </div>
       <div class="update-banner-actions">
-        <button class="btn-reload" on:click={handleReload}>
+        <button class="btn-reload" onclick={handleReload}>
           Reload Now
         </button>
-        <button class="btn-dismiss" on:click={handleDismiss}>
+        <button class="btn-dismiss" onclick={handleDismiss}>
           Later
         </button>
       </div>

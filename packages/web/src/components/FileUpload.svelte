@@ -2,17 +2,13 @@
   import { createEventDispatcher } from 'svelte';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
 
-  export let id: string;
-  export let processing = false;
-  export let accept = 'audio/*';
-  export let multiple = false;
-  export let disabled = false;
+  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let isDragging = false;
+  let isDragging = $state(false);
 
-  $: isDisabled = processing || disabled;
+  let isDisabled = $derived(processing || disabled);
 
   function handleInputChange(event: Event) {
     console.log('FileUpload handleInputChange', event);
@@ -274,14 +270,14 @@
     class="drop-zone"
     class:dragging={isDragging}
     class:disabled={isDisabled}
-    on:dragover={handleDragOver}
-    on:dragleave={handleDragLeave}
-    on:drop={handleDrop}
+    ondragover={handleDragOver}
+    ondragleave={handleDragLeave}
+    ondrop={handleDrop}
   >
     <label for={id} class="file-upload-label" class:disabled={isDisabled}>
       <span>{isDisabled && !processing ? 'Configure preset to enable' : processing ? 'Processing...' : multiple ? 'Choose Audio Files' : 'Choose Audio File'}</span>
     </label>
-    <input type="file" {id} {accept} {multiple} on:change={handleInputChange} disabled={isDisabled} class="file-input" />
+    <input type="file" {id} {accept} {multiple} onchange={handleInputChange} disabled={isDisabled} class="file-input" />
 
     <div class="drop-instruction">{isDisabled && !processing ? 'Select a preset in Settings to analyze files' : `or drag and drop ${multiple ? 'files/folders' : 'file'} here`}</div>
   </div>

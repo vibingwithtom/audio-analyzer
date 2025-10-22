@@ -818,7 +818,7 @@
   {#if !$hasValidPresetConfig}
     <div class="no-preset-warning">
       <span>Please select a Preset or configure Custom criteria to analyze files.</span>
-      <a href="#" on:click|preventDefault={goToSettings}>Select Preset</a>
+      <a href="#" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Select Preset</a>
     </div>
   {:else if $currentPresetId}
     <div class="current-preset">
@@ -826,8 +826,8 @@
       {#if $isSimplifiedMode}
         <span class="preset-name locked">🔒 {availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
       {:else}
-        <span class="preset-name" on:click={goToSettings}>{availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
-        <a href="#" on:click|preventDefault={goToSettings}>Change</a>
+        <span class="preset-name" onclick={goToSettings}>{availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
+        <a href="#" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Change</a>
       {/if}
     </div>
   {/if}
@@ -838,7 +838,7 @@
     accept="audio/*"
     multiple={true}
     disabled={!$hasValidPresetConfig}
-    on:change={handleFileChange}
+    onchange={handleFileChange}
   />
 
   <!-- Analysis Mode Selection (only show for non-auditions presets and not in simplified mode) -->
@@ -855,7 +855,7 @@
               name="analysis-mode"
               value="audio-only"
               checked={$analysisMode === 'audio-only'}
-              on:change={() => setAnalysisMode('audio-only')}
+              onchange={() => setAnalysisMode('audio-only')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -870,7 +870,7 @@
               name="analysis-mode"
               value="filename-only"
               checked={$analysisMode === 'filename-only'}
-              on:change={() => setAnalysisMode('filename-only')}
+              onchange={() => setAnalysisMode('filename-only')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -885,7 +885,7 @@
               name="analysis-mode"
               value="full"
               checked={$analysisMode === 'full'}
-              on:change={() => setAnalysisMode('full')}
+              onchange={() => setAnalysisMode('full')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -900,7 +900,7 @@
               name="analysis-mode"
               value="experimental"
               checked={$analysisMode === 'experimental'}
-              on:change={() => setAnalysisMode('experimental')}
+              onchange={() => setAnalysisMode('experimental')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -917,7 +917,7 @@
               name="analysis-mode"
               value="audio-only"
               checked={$analysisMode === 'audio-only'}
-              on:change={() => setAnalysisMode('audio-only')}
+              onchange={() => setAnalysisMode('audio-only')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -932,7 +932,7 @@
               name="analysis-mode"
               value="experimental"
               checked={$analysisMode === 'experimental'}
-              on:change={() => setAnalysisMode('experimental')}
+              onchange={() => setAnalysisMode('experimental')}
               disabled={processing}
             />
             <div class="radio-content">
@@ -973,7 +973,7 @@
           <div class="progress-fill" style="width: {analysisProgress.progress * 100}%"></div>
         </div>
       {/if}
-      <button class="cancel-button" on:click={handleCancel} disabled={analysisProgress.cancelling}>
+      <button class="cancel-button" onclick={handleCancel} disabled={analysisProgress.cancelling}>
         {analysisProgress.cancelling ? 'Cancelling...' : 'Cancel Analysis'}
       </button>
     </div>
