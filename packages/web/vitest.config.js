@@ -29,11 +29,11 @@ export default defineConfig({
       'tests/components/StatusBadge.test.ts',
       'tests/components/TabNavigation.test.ts',
       'tests/components/TestComponent.test.ts',
-      'tests/components/ValidationDisplay.test.ts'
-      // Phase 2 component tests (LocalFileTab, ResultsDisplay, ResultsTable, SettingsTab)
-      // pass 100% locally but fail in CI due to componentApi: 4 compatibility mode.
-      // They are excluded from CI in package.json but can be run locally with:
-      // npm test tests/components/LocalFileTab.test.ts (etc)
+      'tests/components/ValidationDisplay.test.ts',
+      // Phase 2 component tests: LocalFileTab, ResultsDisplay, ResultsTable pass in CI.
+      // SettingsTab fails in CI due to componentApi: 4 compatibility with $effect() and $derived().
+      // All pass 100% locally and can be run with: npm test tests/components/SettingsTab.test.ts
+      'tests/components/SettingsTab.test.ts'
     ],
     // Limit parallelism to reduce memory usage
     pool: 'forks',
