@@ -90,6 +90,16 @@ const wrappedDiv = document.createElement('div');
 console.log('[SETUP] Wrapped div.appendChild exists:', typeof wrappedDiv.appendChild === 'function');
 console.log('[SETUP] Wrapped div constructor:', wrappedDiv.constructor.name);
 
+// Wrap appendChild to debug what it's called on
+const originalAppendChild = HTMLElementProto?.appendChild;
+if (originalAppendChild && HTMLElementProto) {
+  HTMLElementProto.appendChild = function(this: any, child: Node) {
+    console.log('[APPENDCHILD] Called on:', this.constructor?.name || typeof this, 'nodeType:', this.nodeType, 'hasAppendChild:', !!this.appendChild);
+    console.log('[APPENDCHILD] Appending:', child.constructor?.name || typeof child, 'nodeType:', child.nodeType);
+    return originalAppendChild.call(this, child);
+  };
+}
+
 // Polyfill document.createTextNode for CI jsdom environment
 // CI's jsdom is missing this critical API that Svelte's legacy-client needs
 if (typeof document !== 'undefined' && typeof document.createTextNode !== 'function') {
