@@ -280,6 +280,106 @@ describe('ResultsTable', () => {
     });
   });
 
+  describe('getAudioOnlyStatus', () => {
+    it('should return fail when filename validation fails', () => {
+      const result = createMockAnalysisResult({
+        status: 'pass', // Overall status
+        validation: {
+          filename: {
+            status: 'fail',
+            value: 'invalid-name.wav',
+            issue: 'Filename does not match pattern'
+          }
+        }
+      });
+
+      component = new (ResultsTable as any)({
+        target: container,
+        props: {
+          results: [result],
+          metadataOnly: true  // Use audio-only mode
+        }
+      });
+
+      // Verify the status badge shows 'fail'
+      const statusBadge = document.querySelector('[class*="status-fail"]');
+      expect(statusBadge).toBeTruthy();
+    });
+
+    it('should return warning when filename validation warns', () => {
+      const result = createMockAnalysisResult({
+        status: 'pass',
+        validation: {
+          filename: {
+            status: 'warning',
+            value: 'questionable-name.wav',
+            issue: 'Filename format is unusual'
+          }
+        }
+      });
+
+      component = new (ResultsTable as any)({
+        target: container,
+        props: {
+          results: [result],
+          metadataOnly: true
+        }
+      });
+
+      const statusBadge = document.querySelector('[class*="status-warning"]');
+      expect(statusBadge).toBeTruthy();
+    });
+
+    it('should return pass when filename validation passes', () => {
+      const result = createMockAnalysisResult({
+        status: 'pass',
+        validation: {
+          filename: {
+            status: 'pass',
+            value: 'valid-name.wav'
+          }
+        }
+      });
+
+      component = new (ResultsTable as any)({
+        target: container,
+        props: {
+          results: [result],
+          metadataOnly: true
+        }
+      });
+
+      const statusBadge = document.querySelector('[class*="status-pass"]');
+      expect(statusBadge).toBeTruthy();
+    });
+
+    it('should prioritize filename fail over other passing validations', () => {
+      const result = createMockAnalysisResult({
+        status: 'pass',
+        validation: {
+          sampleRate: { status: 'pass', value: '48000' },
+          bitDepth: { status: 'pass', value: '16' },
+          filename: {
+            status: 'fail',
+            value: 'bad-filename.wav',
+            issue: 'Invalid format'
+          }
+        }
+      });
+
+      component = new (ResultsTable as any)({
+        target: container,
+        props: {
+          results: [result],
+          metadataOnly: true
+        }
+      });
+
+      const statusBadge = document.querySelector('[class*="status-fail"]');
+      expect(statusBadge).toBeTruthy();
+    });
+  });
+
   describe('Experimental Mode', () => {
     it('should display experimental metrics when enabled', () => {
       const result = createMockAnalysisResult({
