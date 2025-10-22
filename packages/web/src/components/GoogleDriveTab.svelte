@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
   import { authState, authService } from '../stores/auth';
+  import { SvelteMap } from 'svelte/reactivity';
   import { AppBridge } from '../bridge/app-bridge';
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
@@ -123,7 +123,10 @@
     }
   }
 
-  onDestroy(cleanup);
+  // Cleanup on component destroy
+  $effect(() => {
+    return cleanup;
+  });
 
   // Helper functions for smart staleness detection
   // For audio properties, check if they were VALIDATED, not just if raw data exists
