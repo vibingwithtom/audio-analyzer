@@ -6,22 +6,27 @@ import { afterEach, vi, beforeAll } from 'vitest';
 // Something (Svelte plugin?) breaks createElement AFTER setup runs
 // We need to ALWAYS wrap it to protect against this
 
-// Capture working DOM methods BEFORE anything can break them
+// Capture working DOM methods from HTMLElement.prototype
+// We can't use createElement because it might already be broken when setup runs
 const originalCreateElement = document.createElement;
-const workingDiv = originalCreateElement.call(document, 'div');
-// Store unbound methods so we can bind them to different elements later
-const workingMethods = {
-  appendChild: workingDiv.appendChild,
-  removeChild: workingDiv.removeChild,
-  insertBefore: workingDiv.insertBefore,
-  replaceChild: workingDiv.replaceChild,
-  cloneNode: workingDiv.cloneNode,
-  contains: workingDiv.contains
-};
+const testDiv = originalCreateElement.call(document, 'div');
 
-console.log('[SETUP] Initial createElement working:', !!workingDiv.appendChild);
-console.log('[SETUP] Initial div constructor:', workingDiv.constructor.name);
-console.log('[SETUP] Captured methods:', Object.keys(workingMethods).filter(k => workingMethods[k]));
+console.log('[SETUP] Initial createElement working:', !!testDiv.appendChild);
+console.log('[SETUP] Initial div constructor:', testDiv.constructor.name);
+
+// Get methods from HTMLElement.prototype which should always exist
+const HTMLElementProto = typeof HTMLElement !== 'undefined' ? HTMLElement.prototype : null;
+const workingMethods = HTMLElementProto ? {
+  appendChild: HTMLElementProto.appendChild,
+  removeChild: HTMLElementProto.removeChild,
+  insertBefore: HTMLElementProto.insertBefore,
+  replaceChild: HTMLElementProto.replaceChild,
+  cloneNode: HTMLElementProto.cloneNode,
+  contains: HTMLElementProto.contains
+} : {};
+
+console.log('[SETUP] HTMLElement.prototype available:', !!HTMLElementProto);
+console.log('[SETUP] Captured methods from prototype:', Object.keys(workingMethods).filter(k => workingMethods[k]));
 
 // ALWAYS wrap createElement to protect against later breakage
 // @ts-ignore - Override createElement to ensure all elements work
