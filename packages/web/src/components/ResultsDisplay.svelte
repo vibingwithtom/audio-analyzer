@@ -9,6 +9,7 @@
   import { exportResultsToCsv, exportResultsEnhanced, type ExportOptions } from '../utils/export-utils';
   import { formatDuration } from '../utils/format-utils';
   import { computeExperimentalStatus } from '../utils/status-utils';
+  import { CriteriaValidator } from '@audio-analyzer/core';
 
   interface ResultsDisplayProps {
     results?: AudioResults | AudioResults[] | null;
@@ -47,12 +48,123 @@
   let batchResults = $derived(isBatchMode ? (results as AudioResults[]) : []);
   let singleResult = $derived(!isBatchMode && results ? (results as AudioResults) : null);
 
-  // Memoize experimental status calculations for performance
+  /**
+   * Compute status for audio-only/filename-only modes.
+   * Only checks basic validation fields, ignoring advanced audio analysis.
+   */
+  function getAudioOnlyStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
+    // For error status (file read failures, etc), preserve it
+    if (result.status === 'error') {
+      return 'error';
+    }
+
+    // Check if any basic validation failed
+    if (result.validation?.fileType?.status === 'fail' ||
+        result.validation?.sampleRate?.status === 'fail' ||
+        result.validation?.bitDepth?.status === 'fail' ||
+        result.validation?.channels?.status === 'fail' ||
+        result.validation?.duration?.status === 'fail') {
+      return 'fail';
+    }
+
+    // Check for filename validation failure (important for filename-only mode)
+    if (result.validation?.filename?.status === 'fail') {
+      return 'fail';
+    }
+
+    // Check for warnings in basic validation
+    if (result.validation?.fileType?.status === 'warning' ||
+        result.validation?.sampleRate?.status === 'warning' ||
+        result.validation?.bitDepth?.status === 'warning' ||
+        result.validation?.channels?.status === 'warning' ||
+        result.validation?.duration?.status === 'warning') {
+      return 'warning';
+    }
+
+    // Check for filename validation warning
+    if (result.validation?.filename?.status === 'warning') {
+      return 'warning';
+    }
+
+    return 'pass';
+  }
+
+  /**
+   * Compute experimental status including preset-aware validations (stereo type, speech overlap).
+   * This matches the logic in ResultsTable.getExperimentalRowStatus() to ensure summary counts
+   * align with row display statuses.
+   */
+  function getExperimentalDisplayStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
+    // Start with the shared experimental status
+    const sharedStatus = computeExperimentalStatus(result);
+    if (sharedStatus === 'error') {
+      return 'fail'; // Map error to fail for summary display
+    }
+
+    let worstStatus: 'pass' | 'warning' | 'fail' = sharedStatus as 'pass' | 'warning' | 'fail';
+
+    // Helper to update worst status
+    const updateWorst = (statusStr: string) => {
+      if (statusStr === 'error' || statusStr === 'fail') {
+        worstStatus = 'fail';
+      } else if (statusStr === 'warning' && worstStatus === 'pass') {
+        worstStatus = 'warning';
+      }
+    };
+
+    // Check stereo type validation (preset-aware)
+    if ($selectedPreset) {
+      const stereoValidation = CriteriaValidator.validateStereoType(
+        result.stereoSeparation,
+        $selectedPreset
+      );
+      if (stereoValidation) {
+        updateWorst(stereoValidation.status);
+      }
+    }
+
+    // Check speech overlap validation (preset-aware)
+    if ($selectedPreset && result.conversationalAnalysis) {
+      const overlapValidation = CriteriaValidator.validateSpeechOverlap(
+        result.conversationalAnalysis,
+        $selectedPreset
+      );
+      if (overlapValidation) {
+        updateWorst(overlapValidation.status);
+      }
+    }
+
+    return worstStatus;
+  }
+
+  /**
+   * Compute display status based on current analysis mode.
+   * Uses mode-specific logic to match what ResultsTable displays in each mode.
+   *
+   * Note: ResultsTable uses getAudioOnlyStatus() for both full and audio-only modes
+   * (only the displayed columns differ, not the status calculation).
+   */
+  function computeDisplayStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
+    // In filename-only, audio-only, OR full mode, use basic validation only
+    // (ResultsTable uses getAudioOnlyStatus for all three modes)
+    if ($analysisMode === 'filename-only' || $analysisMode === 'audio-only' || $analysisMode === 'full') {
+      return getAudioOnlyStatus(result);
+    }
+
+    // In experimental mode, use experimental logic with stereo/overlap checks
+    if ($analysisMode === 'experimental') {
+      return getExperimentalDisplayStatus(result);
+    }
+
+    // Fallback (should not reach here)
+    return result.status;
+  }
+
+  // Memoize mode-aware status calculations for performance
+  // Use mode-specific logic to ensure summary counts match table row statuses
   let enrichedResults = $derived.by(() => batchResults.map(result => ({
     ...result,
-    computedStatus: $analysisMode === 'experimental'
-      ? computeExperimentalStatus(result)
-      : result.status
+    computedStatus: computeDisplayStatus(result)
   })));
 
   // Filter results based on active filter
