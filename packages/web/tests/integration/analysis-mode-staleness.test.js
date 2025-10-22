@@ -3,49 +3,32 @@ import { describe, it, expect, beforeEach } from 'vitest';
 /**
  * Integration Tests for Analysis Mode Staleness Detection
  *
- * Tests the smart staleness detection logic that determines when results
- * need to be reprocessed based on the analysis mode and available data.
+ * Tests that results are marked stale whenever the analysis mode changes.
  *
- * Key behavior:
- * - Full Analysis contains both audio data and filename validation
- * - Audio Only contains only audio data
- * - Filename Only contains only filename validation
- * - Experimental contains audio data (no filename validation)
+ * Simple staleness rule:
+ * - resultsStale = (currentMode !== resultsMode)
  *
- * Smart staleness checks actual data availability, not just mode changes.
+ * When mode changes, always require reprocessing to ensure:
+ * 1. Results are regenerated with correct validation for new mode
+ * 2. Row-level badges update correctly
+ * 3. Summary counts match row calculations
+ * 4. No inconsistencies between modes
  */
 
 describe('Analysis Mode Staleness Detection', () => {
   /**
    * Helper function to simulate the staleness detection logic
-   * from GoogleDriveTab.svelte and BoxTab.svelte
+   * from LocalFileTab.svelte, GoogleDriveTab.svelte, and BoxTab.svelte
+   *
+   * Simple rule: Always mark stale if mode changed
    */
   function checkStaleness(results, resultsMode, currentMode) {
     if (!results || resultsMode === null) {
       return false;
     }
 
-    if (currentMode === resultsMode) {
-      return false;
-    }
-
-    // Check if we actually need to reprocess based on available data
-    const hasAudioData = results.sampleRate && results.sampleRate > 0;
-    const hasFilenameValidation = results.validation?.filename !== undefined;
-
-    let needsReprocessing = false;
-
-    if (currentMode === 'audio-only' && !hasAudioData) {
-      needsReprocessing = true; // Need audio but don't have it
-    } else if (currentMode === 'filename-only' && !hasFilenameValidation) {
-      needsReprocessing = true; // Need filename validation but don't have it
-    } else if (currentMode === 'full' && (!hasAudioData || !hasFilenameValidation)) {
-      needsReprocessing = true; // Need both but missing one or both
-    } else if (currentMode === 'experimental' && !hasAudioData) {
-      needsReprocessing = true; // Experimental needs audio data
-    }
-
-    return needsReprocessing;
+    // Always mark as stale if mode changed - require reprocessing
+    return currentMode !== resultsMode;
   }
 
   describe('Full Analysis → Other Modes', () => {
@@ -67,19 +50,19 @@ describe('Analysis Mode Staleness Detection', () => {
       };
     });
 
-    it('should NOT be stale when switching to Audio Only (has audio data)', () => {
+    it('should be stale when switching to Audio Only (mode changed)', () => {
       const isStale = checkStaleness(fullAnalysisResults, 'full', 'audio-only');
-      expect(isStale).toBe(false);
+      expect(isStale).toBe(true);
     });
 
-    it('should NOT be stale when switching to Filename Only (has filename validation)', () => {
+    it('should be stale when switching to Filename Only (mode changed)', () => {
       const isStale = checkStaleness(fullAnalysisResults, 'full', 'filename-only');
-      expect(isStale).toBe(false);
+      expect(isStale).toBe(true);
     });
 
-    it('should NOT be stale when switching to Experimental (has audio data)', () => {
+    it('should be stale when switching to Experimental (mode changed)', () => {
       const isStale = checkStaleness(fullAnalysisResults, 'full', 'experimental');
-      expect(isStale).toBe(false);
+      expect(isStale).toBe(true);
     });
   });
 
@@ -102,19 +85,19 @@ describe('Analysis Mode Staleness Detection', () => {
       };
     });
 
-    it('should be stale when switching to Filename Only (missing filename validation)', () => {
+    it('should be stale when switching to Filename Only (mode changed)', () => {
       const isStale = checkStaleness(audioOnlyResults, 'audio-only', 'filename-only');
       expect(isStale).toBe(true);
     });
 
-    it('should be stale when switching to Full Analysis (missing filename validation)', () => {
+    it('should be stale when switching to Full Analysis (mode changed)', () => {
       const isStale = checkStaleness(audioOnlyResults, 'audio-only', 'full');
       expect(isStale).toBe(true);
     });
 
-    it('should NOT be stale when switching to Experimental (both have audio data)', () => {
+    it('should be stale when switching to Experimental (mode changed)', () => {
       const isStale = checkStaleness(audioOnlyResults, 'audio-only', 'experimental');
-      expect(isStale).toBe(false);
+      expect(isStale).toBe(true);
     });
   });
 
@@ -172,17 +155,17 @@ describe('Analysis Mode Staleness Detection', () => {
       };
     });
 
-    it('should NOT be stale when switching to Audio Only (both have audio data)', () => {
+    it('should be stale when switching to Audio Only (mode changed)', () => {
       const isStale = checkStaleness(experimentalResults, 'experimental', 'audio-only');
-      expect(isStale).toBe(false);
+      expect(isStale).toBe(true);
     });
 
-    it('should be stale when switching to Filename Only (missing filename validation)', () => {
+    it('should be stale when switching to Filename Only (mode changed)', () => {
       const isStale = checkStaleness(experimentalResults, 'experimental', 'filename-only');
       expect(isStale).toBe(true);
     });
 
-    it('should be stale when switching to Full Analysis (missing filename validation)', () => {
+    it('should be stale when switching to Full Analysis (mode changed)', () => {
       const isStale = checkStaleness(experimentalResults, 'experimental', 'full');
       expect(isStale).toBe(true);
     });
@@ -290,11 +273,11 @@ describe('Analysis Mode Staleness Detection', () => {
         }
       };
 
-      // User wants to just see audio properties (switch to Audio Only)
-      expect(checkStaleness(fullResults, 'full', 'audio-only')).toBe(false);
+      // User switches to Audio Only mode - always requires reprocessing
+      expect(checkStaleness(fullResults, 'full', 'audio-only')).toBe(true);
 
-      // User wants to check filename only (switch to Filename Only)
-      expect(checkStaleness(fullResults, 'full', 'filename-only')).toBe(false);
+      // User switches to Filename Only mode - always requires reprocessing
+      expect(checkStaleness(fullResults, 'full', 'filename-only')).toBe(true);
     });
 
     it('should handle quick filename validation then full analysis', () => {
@@ -307,7 +290,7 @@ describe('Analysis Mode Staleness Detection', () => {
         }
       };
 
-      // User wants full analysis (needs reprocessing for audio data)
+      // User wants full analysis - always requires reprocessing on mode change
       expect(checkStaleness(filenameResults, 'filename-only', 'full')).toBe(true);
     });
 
@@ -326,8 +309,8 @@ describe('Analysis Mode Staleness Detection', () => {
       };
 
       // User wants to see basic audio properties (switch to Audio Only)
-      // Should NOT need reprocessing - both have audio data
-      expect(checkStaleness(experimentalResults, 'experimental', 'audio-only')).toBe(false);
+      // Always requires reprocessing on mode change
+      expect(checkStaleness(experimentalResults, 'experimental', 'audio-only')).toBe(true);
     });
   });
 });
