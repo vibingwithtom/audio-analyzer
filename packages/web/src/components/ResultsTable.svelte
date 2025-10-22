@@ -150,6 +150,11 @@
    * Compute status for audio-only mode (only consider basic validation fields)
    */
   function getAudioOnlyStatus(result: AudioResults): 'pass' | 'warning' | 'fail' | 'error' {
+    // For error status (file read failures, etc), preserve it
+    if (result.status === 'error') {
+      return 'error';
+    }
+
     // Check if any basic validation failed
     if (result.validation?.fileType?.status === 'fail' ||
         result.validation?.sampleRate?.status === 'fail' ||
@@ -159,9 +164,9 @@
       return 'fail';
     }
 
-    // For error status (file read failures, etc), preserve it
-    if (result.status === 'error') {
-      return 'error';
+    // Check for filename validation failure (important for filename-only mode)
+    if (result.validation?.filename?.status === 'fail') {
+      return 'fail';
     }
 
     // Check for warnings in basic validation
@@ -170,6 +175,11 @@
         result.validation?.bitDepth?.status === 'warning' ||
         result.validation?.channels?.status === 'warning' ||
         result.validation?.duration?.status === 'warning') {
+      return 'warning';
+    }
+
+    // Check for filename validation warning
+    if (result.validation?.filename?.status === 'warning') {
       return 'warning';
     }
 
