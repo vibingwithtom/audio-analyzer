@@ -838,7 +838,7 @@
     accept="audio/*"
     multiple={true}
     disabled={!$hasValidPresetConfig}
-    onchange={handleFileChange}
+    on:change={handleFileChange}
   />
 
   <!-- Analysis Mode Selection (only show for non-auditions presets and not in simplified mode) -->
