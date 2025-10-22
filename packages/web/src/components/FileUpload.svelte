@@ -2,7 +2,15 @@
   import { createEventDispatcher } from 'svelte';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
 
-  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false } = $props();
+  interface FileUploadProps {
+    id: string;
+    processing?: boolean;
+    accept?: string;
+    multiple?: boolean;
+    disabled?: boolean;
+  }
+
+  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false }: FileUploadProps = $props();
 
   const dispatch = createEventDispatcher();
 

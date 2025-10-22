@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  let { visible = false, onReload = () => {}, onDismiss = () => {} } = $props();
+  interface UpdateBannerProps {
+    visible?: boolean;
+    onReload?: () => void;
+    onDismiss?: () => void;
+  }
+
+  let { visible = false, onReload = () => {}, onDismiss = () => {} }: UpdateBannerProps = $props();
 
   let dismissed = $state(false);
 
