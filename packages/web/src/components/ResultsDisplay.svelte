@@ -132,9 +132,9 @@
   }
 
   // Export state
-  let isExporting = false;
-  let exportError: string | null = null;
-  let exportSuccess = false;
+  let isExporting = $state(false);
+  let exportError = $state<string | null>(null);
+  let exportSuccess = $state(false);
 
   // Export handler
   function handleExport() {
