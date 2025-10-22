@@ -27,7 +27,8 @@ jobs:
         run: |
           # Workaround for npm ci platform-specific dependency issues
           # See: https://github.com/npm/cli/issues/4828
-          npm ci --no-audit || npm install --no-audit
+          # Use --include=optional to ensure platform-specific packages install
+          npm ci --no-audit --include=optional || npm install --no-audit --include=optional
 
       - name: Run tests
         working-directory: ./packages/web
