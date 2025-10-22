@@ -595,7 +595,7 @@
             <select
               id="custom-file-type"
               multiple
-              bind:value={customFileTypes}
+              value={customFileTypes}
               onchange={(e) => handleMultiSelect(e, 'fileType')}
             >
               {#each fileTypeOptions as fileType}
@@ -611,7 +611,7 @@
             <select
               id="custom-sample-rate"
               multiple
-              bind:value={customSampleRates}
+              value={customSampleRates}
               onchange={(e) => handleMultiSelect(e, 'sampleRate')}
             >
               {#each sampleRateOptions as rate}
@@ -627,7 +627,7 @@
             <select
               id="custom-bit-depth"
               multiple
-              bind:value={customBitDepths}
+              value={customBitDepths}
               onchange={(e) => handleMultiSelect(e, 'bitDepth')}
             >
               {#each bitDepthOptions as depth}
@@ -643,7 +643,7 @@
             <select
               id="custom-channels"
               multiple
-              bind:value={customChannels}
+              value={customChannels}
               onchange={(e) => handleMultiSelect(e, 'channels')}
             >
               {#each channelOptions as channel}
@@ -663,7 +663,7 @@
               type="number"
               min="0"
               placeholder="e.g., 120 for 2 minutes"
-              bind:value={customMinDuration}
+              value={customMinDuration}
               oninput={handleDurationChange}
             />
             <span class="field-hint">Leave empty for no minimum duration requirement</span>

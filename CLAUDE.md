@@ -211,6 +211,7 @@ Follow this workflow for optimal results:
 - **mcp__svelte__svelte-autofixer** - Static analysis with fixes and best practice suggestions
 - **mcp__svelte__playground-link** - Generate Svelte Playground URLs (only after user confirmation, never for project files)
 
+
 ### Best Practices
 
 - Start with `list-sections` to understand what documentation is available

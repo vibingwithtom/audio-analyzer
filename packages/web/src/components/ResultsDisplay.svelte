@@ -10,69 +10,86 @@
   import { formatDuration } from '../utils/format-utils';
   import { computeExperimentalStatus } from '../utils/status-utils';
 
-  // Props
-  export let results: AudioResults | AudioResults[] | null = null;
-  export let isProcessing = false;
-  export let error: string | null = null;
-  export let resultsMode: AnalysisMode | null = null;
-  export let resultsStale = false;
-  export let processedFiles = 0;
-  export let totalFiles = 0;
-  export let onReprocess: (() => void) | null = null;
-  export let onCancel: (() => void) | null = null;
-  export let cancelRequested = false;
-  export let folderName: string | null = null; // Name of folder being processed
-  export let folderUrl: string | null = null; // URL of folder being processed
-  export let showBuiltInProgress = true; // Controls whether to show the built-in progress bar
+  interface ResultsDisplayProps {
+    results?: AudioResults | AudioResults[] | null;
+    isProcessing?: boolean;
+    error?: string | null;
+    resultsMode?: AnalysisMode | null;
+    resultsStale?: boolean;
+    processedFiles?: number;
+    totalFiles?: number;
+    onReprocess?: (() => void) | null;
+    onCancel?: (() => void) | null;
+    cancelRequested?: boolean;
+    folderName?: string | null;
+    folderUrl?: string | null;
+    showBuiltInProgress?: boolean;
+  }
+
+  let {
+    results = null,
+    isProcessing = false,
+    error = null,
+    resultsMode = null,
+    resultsStale = false,
+    processedFiles = 0,
+    totalFiles = 0,
+    onReprocess = null,
+    onCancel = null,
+    cancelRequested = false,
+    folderName = null,
+    folderUrl = null,
+    showBuiltInProgress = true
+  }: ResultsDisplayProps = $props();
 
   // Determine if we're in batch mode
-  $: isBatchMode = Array.isArray(results);
-  $: batchResults = isBatchMode ? results as AudioResults[] : [];
-  $: singleResult = !isBatchMode && results ? results as AudioResults : null;
+  let isBatchMode = $derived(Array.isArray(results));
+  let batchResults = $derived(isBatchMode ? (results as AudioResults[]) : []);
+  let singleResult = $derived(!isBatchMode && results ? (results as AudioResults) : null);
 
   // Memoize experimental status calculations for performance
-  $: enrichedResults = batchResults.map(result => ({
+  let enrichedResults = $derived.by(() => batchResults.map(result => ({
     ...result,
     computedStatus: $analysisMode === 'experimental'
       ? computeExperimentalStatus(result)
       : result.status
-  }));
+  })));
 
   // Filter results based on active filter
-  $: filteredResults = !$resultsFilter
-    ? enrichedResults
-    : enrichedResults.filter(r => {
-        // Errors are a special case: they bypass experimental status computation
-        // because errors occur before quality analysis (e.g., file read failures).
-        // Error status is set before any audio analysis happens.
-        if ($resultsFilter === 'error') {
-          return r.status === 'error';
-        }
-        // For quality-based filters (pass/warning/fail), only consider non-error results
-        // and use computedStatus which reflects experimental mode quality metrics.
-        // This ensures errors don't appear in pass/warning/fail filters, even if
-        // they somehow had a computed status.
-        return r.status !== 'error' && r.computedStatus === $resultsFilter;
-      });
-
+  let filteredResults = $derived.by(() => {
+    if (!$resultsFilter) return enrichedResults;
+    return enrichedResults.filter(r => {
+      // Errors are a special case: they bypass experimental status computation
+      // because errors occur before quality analysis (e.g., file read failures).
+      // Error status is set before any audio analysis happens.
+      if ($resultsFilter === 'error') {
+        return r.status === 'error';
+      }
+      // For quality-based filters (pass/warning/fail), only consider non-error results
+      // and use computedStatus which reflects experimental mode quality metrics.
+      // This ensures errors don't appear in pass/warning/fail filters, even if
+      // they somehow had a computed status.
+      return r.status !== 'error' && r.computedStatus === $resultsFilter;
+    });
+  });
 
   // Calculate batch statistics using enrichedResults for consistency
-  $: passCount = enrichedResults.filter(r =>
+  let passCount = $derived(enrichedResults.filter(r =>
     r.status !== 'error' && r.computedStatus === 'pass'
-  ).length;
+  ).length);
 
-  $: warningCount = enrichedResults.filter(r =>
+  let warningCount = $derived(enrichedResults.filter(r =>
     r.status !== 'error' && r.computedStatus === 'warning'
-  ).length;
+  ).length);
 
-  $: failCount = enrichedResults.filter(r =>
+  let failCount = $derived(enrichedResults.filter(r =>
     r.status !== 'error' && r.computedStatus === 'fail'
-  ).length;
+  ).length);
 
-  $: errorCount = enrichedResults.filter(r => r.status === 'error').length;
+  let errorCount = $derived(enrichedResults.filter(r => r.status === 'error').length);
 
   // Calculate total duration (not shown in experimental mode)
-  $: totalDuration = (() => {
+  let totalDuration = $derived.by(() => {
     if (!isBatchMode || $analysisMode === 'filename-only' || $analysisMode === 'experimental') return null;
 
     // Only for pass+warning files in standard modes
@@ -80,7 +97,7 @@
     const total = filesToInclude.reduce((sum, r) => sum + (r.duration || 0), 0);
 
     return formatDuration(total);
-  })();
+  });
 
   // Format results mode for display
   function formatResultsMode(mode: AnalysisMode | null): string {
@@ -115,9 +132,9 @@
   }
 
   // Export state
-  let isExporting = false;
-  let exportError: string | null = null;
-  let exportSuccess = false;
+  let isExporting = $state(false);
+  let exportError = $state<string | null>(null);
+  let exportSuccess = $state(false);
 
   // Export handler
   function handleExport() {
