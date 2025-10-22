@@ -190,6 +190,35 @@ Vanilla JS SPA built with Vite. Key files:
   - Bilingual: `[ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]`
 - **Batch Processing**: Google Drive folders, Box folders, local multi-file selection
 
+## Svelte MCP Integration
+
+**The Svelte MCP server is available to help with Svelte development.**
+
+### When Working with `.svelte` Files
+
+Follow this workflow for optimal results:
+
+1. **Discover documentation** - Use `mcp__svelte__list-sections` to find relevant docs
+2. **Fetch targeted docs** - Use `mcp__svelte__get-documentation` for specific sections (more token-efficient than loading full docs)
+3. **Write/modify Svelte code** - Implement the feature or fix
+4. **Validate with autofixer** - Use `mcp__svelte__svelte-autofixer` on generated code
+5. **Iterate** - Repeat autofixer until no issues remain
+
+### MCP Tools Available
+
+- **mcp__svelte__list-sections** - Discover all available documentation sections
+- **mcp__svelte__get-documentation** - Retrieve specific documentation (saves tokens!)
+- **mcp__svelte__svelte-autofixer** - Static analysis with fixes and best practice suggestions
+- **mcp__svelte__playground-link** - Generate Svelte Playground URLs (only after user confirmation, never for project files)
+
+### Best Practices
+
+- Start with `list-sections` to understand what documentation is available
+- Fetch only the documentation sections you need
+- Always run `svelte-autofixer` on new/modified Svelte components
+- Don't proceed until autofixer reports no issues
+- Use playground links sparingly and only for demonstration purposes
+
 ## Git/GitHub Workflow
 
 ### Branch Strategy
