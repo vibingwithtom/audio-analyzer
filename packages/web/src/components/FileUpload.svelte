@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
 
   interface FileUploadProps {
@@ -8,11 +7,10 @@
     accept?: string;
     multiple?: boolean;
     disabled?: boolean;
+    onChange?: (event: Event) => void;
   }
 
-  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false }: FileUploadProps = $props();
-
-  const dispatch = createEventDispatcher<{ change: Event }>();
+  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false, onChange }: FileUploadProps = $props();
 
   let isDragging = $state(false);
 
@@ -20,7 +18,7 @@
 
   function handleInputChange(event: Event) {
     console.log('FileUpload handleInputChange', event);
-    dispatch('change', event);
+    onChange?.(event);
   }
 
   function handleDragOver(event: DragEvent) {
@@ -33,6 +31,14 @@
   function handleDragLeave(event: DragEvent) {
     event.preventDefault();
     isDragging = false;
+  }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (!isDisabled && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      const input = document.getElementById(id) as HTMLInputElement;
+      input?.click();
+    }
   }
 
   async function getAllFilesFromEntry(entry: any): Promise<File[]> {
@@ -278,15 +284,21 @@
     class="drop-zone"
     class:dragging={isDragging}
     class:disabled={isDisabled}
+    role="button"
+    tabindex={isDisabled ? -1 : 0}
+    aria-disabled={isDisabled}
+    aria-busy={processing}
+    aria-label={multiple ? 'Upload audio files' : 'Upload audio file'}
     ondragover={handleDragOver}
     ondragleave={handleDragLeave}
     ondrop={handleDrop}
+    onkeydown={handleKeyDown}
   >
-    <label for={id} class="file-upload-label" class:disabled={isDisabled}>
+    <label for={id} class="file-upload-label" class:disabled={isDisabled} aria-disabled={isDisabled}>
       <span>{isDisabled && !processing ? 'Configure preset to enable' : processing ? 'Processing...' : multiple ? 'Choose Audio Files' : 'Choose Audio File'}</span>
     </label>
     <input type="file" {id} {accept} {multiple} onchange={handleInputChange} disabled={isDisabled} class="file-input" />
 
-    <div class="drop-instruction">{isDisabled && !processing ? 'Select a preset in Settings to analyze files' : `or drag and drop ${multiple ? 'files/folders' : 'file'} here`}</div>
+    <div class="drop-instruction" role="status">{isDisabled && !processing ? 'Select a preset in Settings to analyze files' : `or drag and drop ${multiple ? 'files/folders' : 'file'} here`}</div>
   </div>
 </div>
