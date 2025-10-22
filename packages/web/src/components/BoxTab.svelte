@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { authState, authService } from '../stores/auth';
   import { AppBridge } from '../bridge/app-bridge';
   import ResultsDisplay from './ResultsDisplay.svelte';
@@ -123,7 +122,10 @@
     }
   }
 
-  onDestroy(cleanup);
+  // Cleanup on component destroy
+  $effect(() => {
+    return cleanup;
+  });
 
   // Helper functions for smart staleness detection
   function hasValidatedAudioProperties(result: AudioResults): boolean {
