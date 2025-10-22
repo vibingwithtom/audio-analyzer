@@ -14,7 +14,7 @@
     getMicBleedStatus
   } from '../utils/status-utils';
 
-  import { onMount, onDestroy } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
 
   const {
     results = [],
@@ -39,7 +39,7 @@
   // Lazy blob URL management - create on-demand to prevent memory buildup
   // Use WeakMap keyed by result object to avoid issues with duplicate filenames
   const blobUrlCache = new WeakMap<AudioResults, string>();
-  const createdUrls = new Set<string>(); // Track URLs for cleanup
+  const createdUrls = new SvelteSet<string>(); // Track URLs for cleanup
 
   function getAudioUrl(result: AudioResults): string | null {
     // Use existing audioUrl if available
@@ -62,9 +62,11 @@
   }
 
   // Cleanup blob URLs on component destroy
-  onDestroy(() => {
-    createdUrls.forEach(url => URL.revokeObjectURL(url));
-    createdUrls.clear();
+  $effect(() => {
+    return () => {
+      createdUrls.forEach(url => URL.revokeObjectURL(url));
+      createdUrls.clear();
+    };
   });
 
   // Check if table has horizontal scroll and which direction
@@ -104,8 +106,8 @@
     }
   }
 
-  // Check scroll on mount and when results change
-  onMount(() => {
+  // Set up window event listeners on mount and cleanup on destroy
+  $effect(() => {
     window.addEventListener('resize', checkScroll);
     window.addEventListener('keydown', handleKeydown);
 
