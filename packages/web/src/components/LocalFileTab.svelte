@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import FileUpload from './FileUpload.svelte';
   import ResultsDisplay from './ResultsDisplay.svelte';
   import { analyzeAudioFile } from '../services/audio-analysis-service';
@@ -70,7 +69,10 @@
     });
   }
 
-  onDestroy(cleanup);
+  // Cleanup on component destroy
+  $effect(() => {
+    return cleanup;
+  });
 
   // Auto-set mode for auditions presets (watch for preset changes)
   $effect(() => {
