@@ -53,7 +53,7 @@
    * This matches the logic in ResultsTable.getExperimentalRowStatus() to ensure summary counts
    * align with row display statuses.
    */
-  function computeDisplayStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
+  function getExperimentalDisplayStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
     // Start with the shared experimental status
     const sharedStatus = computeExperimentalStatus(result);
     if (sharedStatus === 'error') {
@@ -100,7 +100,7 @@
   let enrichedResults = $derived.by(() => batchResults.map(result => ({
     ...result,
     computedStatus: $analysisMode === 'experimental'
-      ? computeDisplayStatus(result)
+      ? getExperimentalDisplayStatus(result)
       : result.status
   })));
 
