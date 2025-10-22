@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
   import { isSimplifiedMode } from '../stores/simplifiedMode';
 
   interface FileUploadProps {
@@ -8,11 +7,10 @@
     accept?: string;
     multiple?: boolean;
     disabled?: boolean;
+    onchange?: (event: Event) => void;
   }
 
-  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false }: FileUploadProps = $props();
-
-  const dispatch = createEventDispatcher();
+  let { id, processing = false, accept = 'audio/*', multiple = false, disabled = false, onchange }: FileUploadProps = $props();
 
   let isDragging = $state(false);
 
@@ -20,7 +18,7 @@
 
   function handleInputChange(event: Event) {
     console.log('FileUpload handleInputChange', event);
-    dispatch('change', event);
+    onchange?.(event);
   }
 
   function handleDragOver(event: DragEvent) {
