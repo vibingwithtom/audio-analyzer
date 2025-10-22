@@ -661,6 +661,14 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
+  .analysis-mode-section legend {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary, #333333);
+    padding: 0 0.25rem;
+    margin-bottom: 1rem;
+  }
+
   .analysis-mode-section h3 {
     margin: 0 0 1rem 0;
     font-size: 0.95rem;
@@ -820,16 +828,16 @@
   {#if !$hasValidPresetConfig}
     <div class="no-preset-warning">
       <span>Please select a Preset or configure Custom criteria to analyze files.</span>
-      <a href="#" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Select Preset</a>
+      <a href="#" role="button" aria-label="Open settings to select a preset" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Select Preset</a>
     </div>
   {:else if $currentPresetId}
-    <div class="current-preset">
+    <div class="current-preset" role="region" aria-label="Current preset selection">
       <span class="preset-label">Current Preset:</span>
       {#if $isSimplifiedMode}
-        <span class="preset-name locked">🔒 {availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
+        <span class="preset-name locked" aria-disabled="true">🔒 {availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
       {:else}
         <span class="preset-name" onclick={goToSettings}>{availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
-        <a href="#" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Change</a>
+        <a href="#" role="button" aria-label="Open settings to change preset" onclick={(e) => { e.preventDefault(); goToSettings(); }}>Change</a>
       {/if}
     </div>
   {/if}
@@ -845,8 +853,8 @@
 
   <!-- Analysis Mode Selection (only show for non-auditions presets and not in simplified mode) -->
   {#if !$currentPresetId?.startsWith('auditions-') && !$isSimplifiedMode}
-    <div class="analysis-mode-section">
-      <h3>Analysis Mode:</h3>
+    <fieldset class="analysis-mode-section">
+      <legend>Analysis Mode:</legend>
       <div class="radio-group">
 
         {#if availablePresets[$currentPresetId]?.supportsFilenameValidation && availablePresets[$currentPresetId]?.filenameValidationType !== 'script-match'}
@@ -951,31 +959,45 @@
           ℹ️ <strong>Note:</strong> Three Hour filename validation requires Google Drive. Use the Google Drive tab for filename validation, or select Audio Analysis/Experimental here.
         </div>
       {/if}
-    </div>
+    </fieldset>
   {/if}
 
   <!-- Unified Progress Bar -->
   {#if analysisProgress.visible}
-    <div class="analysis-progress">
+    <div class="analysis-progress" role="status" aria-live="polite" aria-label="File analysis progress">
       {#if analysisProgress.batchTotal > 1}
         <!-- Batch mode: Show file count and current file progress -->
-        <div class="batch-counter">
+        <div class="batch-counter" aria-live="assertive">
           Processing file {analysisProgress.batchCurrent} of {analysisProgress.batchTotal}
         </div>
-        <div class="progress-filename">{analysisProgress.filename}</div>
+        <div class="progress-filename" aria-live="polite">{analysisProgress.filename}</div>
         <div class="progress-message">{analysisProgress.message} ({Math.round(analysisProgress.progress * 100)}%)</div>
-        <div class="progress-bar">
+        <div
+          class="progress-bar"
+          role="progressbar"
+          aria-valuenow={Math.round(analysisProgress.progress * 100)}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label={`${analysisProgress.filename} analysis progress: ${Math.round(analysisProgress.progress * 100)}%`}
+        >
           <div class="progress-fill" style="width: {analysisProgress.progress * 100}%"></div>
         </div>
       {:else}
         <!-- Single file mode: Show only file progress -->
-        <div class="progress-filename">{analysisProgress.filename}</div>
+        <div class="progress-filename" aria-live="polite">{analysisProgress.filename}</div>
         <div class="progress-message">{analysisProgress.message} ({Math.round(analysisProgress.progress * 100)}%)</div>
-        <div class="progress-bar">
+        <div
+          class="progress-bar"
+          role="progressbar"
+          aria-valuenow={Math.round(analysisProgress.progress * 100)}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label={`${analysisProgress.filename} analysis progress: ${Math.round(analysisProgress.progress * 100)}%`}
+        >
           <div class="progress-fill" style="width: {analysisProgress.progress * 100}%"></div>
         </div>
       {/if}
-      <button class="cancel-button" onclick={handleCancel} disabled={analysisProgress.cancelling}>
+      <button class="cancel-button" onclick={handleCancel} disabled={analysisProgress.cancelling} aria-label="Cancel file analysis">
         {analysisProgress.cancelling ? 'Cancelling...' : 'Cancel Analysis'}
       </button>
     </div>
