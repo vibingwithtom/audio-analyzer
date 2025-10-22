@@ -44,6 +44,61 @@ This directory contains comprehensive tests for the Audio Analyzer web applicati
    - Metadata-only mode handling
    - Covers ~50 lines of status calculation logic
 
+### Component Tests (`tests/components/`)
+
+**Phase 2 P1 Component Tests - Local Development Only:**
+
+**⚠️ These 135 tests are excluded from CI but pass 100% locally**
+
+See `tests/components/README.md` for details and `CI_TESTING_ISSUE.md` for technical investigation.
+
+1. **LocalFileTab.test.ts** (45 tests)
+   - Component rendering and initialization
+   - File upload handling (single/multiple files)
+   - Analysis mode selection (metadata-only, base, experimental)
+   - Analysis execution and results display
+   - Batch processing workflows
+   - Error handling and validation
+   - UI state management
+
+2. **ResultsDisplay.test.ts** (30 tests)
+   - Results panel rendering
+   - Property display (sample rate, bit depth, channels, etc.)
+   - Validation status display
+   - Advanced analysis metrics display (peak levels, noise floor, etc.)
+   - Audio player integration
+   - Error state handling
+   - Mode switching (metadata/full analysis)
+
+3. **ResultsTable.test.ts** (20 tests)
+   - Batch results table rendering
+   - Column display and ordering
+   - Result row rendering
+   - Export functionality (CSV, JSON)
+   - Status indicators
+   - Empty state handling
+
+4. **SettingsTab.test.ts** (40 tests)
+   - Settings panel rendering
+   - Preset selection (Auditions, P2B2, Three Hour, etc.)
+   - Custom criteria configuration
+   - Form inputs and validation
+   - Preset switching behavior
+   - Settings persistence
+
+**Why excluded from CI:**
+- Fail in CI due to Svelte 5 `componentApi: 4` compatibility mode + DOM emulation incompatibility
+- `createElement` returns plain Objects in both jsdom and happy-dom CI environments
+- Work perfectly locally (macOS handles optional dependencies differently)
+
+**Running locally:**
+```bash
+npm test tests/components/LocalFileTab.test.ts
+npm test tests/components/ResultsDisplay.test.ts
+npm test tests/components/ResultsTable.test.ts
+npm test tests/components/SettingsTab.test.ts
+```
+
 ### Integration Tests (`tests/integration/`)
 
 **Phase 3 Tests - End-to-End Workflows:**
@@ -125,14 +180,22 @@ npm run test:coverage
 ## Current Status
 
 **Phase 1:** ✅ Complete - Test infrastructure set up
-**Phase 2:** ✅ Complete - All unit test specifications written (7 test files covering ~620 lines of logic)
+**Phase 2 Business Logic:** ✅ Complete - All unit test specifications written (7 test files covering ~620 lines of logic)
+**Phase 2 Components:** ✅ Complete - 135 component tests written (4 test files, 100% pass locally, excluded from CI)
 **Phase 3:** ✅ Complete - All integration test specifications written (4 test files covering complete workflows)
+
+**Total Tests:**
+- **1126 tests in CI** (passing ✅)
+- **135 component tests locally** (passing ✅, excluded from CI)
+- **1261 total tests**
 
 ## Coverage Goals
 
 - Phase 2 Complete: ≥60% code coverage (core logic)
 - Phase 3 Complete: ≥70% code coverage (integration)
 - Final: ≥75% code coverage
+
+**Note:** Component tests provide excellent coverage but don't contribute to CI coverage metrics due to exclusion.
 
 ## Implementation Notes
 
@@ -176,7 +239,15 @@ After Phase 4 refactoring completes:
 
 ## Next Steps
 
-1. **Phase 4: Refactor with TypeScript** - Extract functions from main.js into testable TypeScript modules
-2. **Implement test specifications** - Convert specifications to working tests as modules are extracted
-3. **Achieve 75%+ coverage** - Run coverage reports and fill any gaps
-4. **Phase 5: Svelte Migration** - Migrate to component-based architecture with component tests
+1. **Enable component tests in CI** - Re-enable when `componentApi: 4` is no longer needed or Vitest 4.x stable is available
+2. **Phase 2 P2: Test remaining components** (optional) - BoxTab, GoogleDriveTab (would also be local-only)
+3. **Phase 4: Refactor with TypeScript** - Extract functions from main.js into testable TypeScript modules
+4. **Implement test specifications** - Convert specifications to working tests as modules are extracted
+5. **Achieve 75%+ coverage** - Run coverage reports and fill any gaps
+
+## Component Test Future
+
+Component tests will be enabled in CI when:
+- Svelte 5 migration complete (remove `componentApi: 4`)
+- Vitest 4.x stable released (enables `vitest-browser-svelte` for real browser testing)
+- Alternative solution implemented (see `CI_TESTING_ISSUE.md` for options)
