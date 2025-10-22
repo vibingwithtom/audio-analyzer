@@ -9,6 +9,7 @@
   import { exportResultsToCsv, exportResultsEnhanced, type ExportOptions } from '../utils/export-utils';
   import { formatDuration } from '../utils/format-utils';
   import { computeExperimentalStatus } from '../utils/status-utils';
+  import { CriteriaValidator } from '@audio-analyzer/core';
 
   interface ResultsDisplayProps {
     results?: AudioResults | AudioResults[] | null;
@@ -47,11 +48,59 @@
   let batchResults = $derived(isBatchMode ? (results as AudioResults[]) : []);
   let singleResult = $derived(!isBatchMode && results ? (results as AudioResults) : null);
 
+  /**
+   * Compute experimental status including preset-aware validations (stereo type, speech overlap).
+   * This matches the logic in ResultsTable.getExperimentalRowStatus() to ensure summary counts
+   * align with row display statuses.
+   */
+  function computeDisplayStatus(result: AudioResults): 'pass' | 'warning' | 'fail' {
+    // Start with the shared experimental status
+    const sharedStatus = computeExperimentalStatus(result);
+    if (sharedStatus === 'error') {
+      return 'fail'; // Map error to fail for summary display
+    }
+
+    let worstStatus: 'pass' | 'warning' | 'fail' = sharedStatus as 'pass' | 'warning' | 'fail';
+
+    // Helper to update worst status
+    const updateWorst = (statusStr: string) => {
+      if (statusStr === 'error' || statusStr === 'fail') {
+        worstStatus = 'fail';
+      } else if (statusStr === 'warning' && worstStatus === 'pass') {
+        worstStatus = 'warning';
+      }
+    };
+
+    // Check stereo type validation (preset-aware)
+    if ($selectedPreset) {
+      const stereoValidation = CriteriaValidator.validateStereoType(
+        result.stereoSeparation,
+        $selectedPreset
+      );
+      if (stereoValidation) {
+        updateWorst(stereoValidation.status);
+      }
+    }
+
+    // Check speech overlap validation (preset-aware)
+    if ($selectedPreset && result.conversationalAnalysis) {
+      const overlapValidation = CriteriaValidator.validateSpeechOverlap(
+        result.conversationalAnalysis,
+        $selectedPreset
+      );
+      if (overlapValidation) {
+        updateWorst(overlapValidation.status);
+      }
+    }
+
+    return worstStatus;
+  }
+
   // Memoize experimental status calculations for performance
   let enrichedResults = $derived.by(() => batchResults.map(result => ({
     ...result,
     computedStatus: $analysisMode === 'experimental'
-      ? computeExperimentalStatus(result)
+      ? computeDisplayStatus(result)
       : result.status
   })));
 
