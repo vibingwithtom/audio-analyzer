@@ -127,53 +127,6 @@
     return cleanup;
   });
 
-  // Helper functions for smart staleness detection
-  function hasValidatedAudioProperties(result: AudioResults): boolean {
-    return result.validation?.sampleRate !== undefined || result.validation?.bitDepth !== undefined;
-  }
-
-  function hasFilenameValidation(result: AudioResults): boolean {
-    return result.validation?.filename !== undefined;
-  }
-
-  function hasExperimentalMetrics(result: AudioResults): boolean {
-    return result.peakDb !== undefined || result.reverbInfo !== undefined;
-  }
-
-  function areResultsStaleForMode(
-    results: AudioResults | AudioResults[],
-    newMode: AnalysisMode,
-    currentPreset: any
-  ): boolean {
-    const resultArray = Array.isArray(results) ? results : [results];
-    const firstResult = resultArray[0];
-
-    if (!firstResult) return true;
-
-    switch (newMode) {
-      case 'audio-only':
-        return !hasValidatedAudioProperties(firstResult);
-
-      case 'filename-only':
-        if (currentPreset?.supportsFilenameValidation) {
-          return !hasFilenameValidation(firstResult);
-        }
-        return false;
-
-      case 'full':
-        const needsFilename = currentPreset?.supportsFilenameValidation;
-        if (!hasValidatedAudioProperties(firstResult)) return true;
-        if (needsFilename && !hasFilenameValidation(firstResult)) return true;
-        return false;
-
-      case 'experimental':
-        return !hasExperimentalMetrics(firstResult);
-
-      default:
-        return false;
-    }
-  }
-
   // Staleness detection - require reprocessing on ANY mode change
   $effect(() => {
     if ((results || batchResults.length > 0) && resultsMode !== null) {

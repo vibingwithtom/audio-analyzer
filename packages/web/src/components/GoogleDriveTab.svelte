@@ -128,58 +128,6 @@
     return cleanup;
   });
 
-  // Helper functions for smart staleness detection
-  // For audio properties, check if they were VALIDATED, not just if raw data exists
-  function hasValidatedAudioProperties(result: AudioResults): boolean {
-    return result.validation?.sampleRate !== undefined || result.validation?.bitDepth !== undefined;
-  }
-
-  function hasFilenameValidation(result: AudioResults): boolean {
-    return result.validation?.filename !== undefined;
-  }
-
-  function hasExperimentalMetrics(result: AudioResults): boolean {
-    return result.peakDb !== undefined || result.reverbInfo !== undefined;
-  }
-
-  function areResultsStaleForMode(
-    results: AudioResults | AudioResults[],
-    newMode: AnalysisMode,
-    currentPreset: any
-  ): boolean {
-    const resultArray = Array.isArray(results) ? results : [results];
-    const firstResult = resultArray[0];
-
-    if (!firstResult) return true; // No results = stale
-
-    switch (newMode) {
-      case 'audio-only':
-        // Need audio properties (check for VALIDATED data, not just raw data)
-        return !hasValidatedAudioProperties(firstResult);
-
-      case 'filename-only':
-        // Need filename validation (if preset supports it)
-        if (currentPreset?.supportsFilenameValidation) {
-          return !hasFilenameValidation(firstResult);
-        }
-        return false; // Preset doesn't support filename validation, so not stale
-
-      case 'full':
-        // Need both audio properties and filename validation
-        const needsFilename = currentPreset?.supportsFilenameValidation;
-        if (!hasValidatedAudioProperties(firstResult)) return true;
-        if (needsFilename && !hasFilenameValidation(firstResult)) return true;
-        return false;
-
-      case 'experimental':
-        // Need experimental metrics
-        return !hasExperimentalMetrics(firstResult);
-
-      default:
-        return false;
-    }
-  }
-
   // Staleness detection - require reprocessing on ANY mode change
   $effect(() => {
     if ((results || batchResults.length > 0) && resultsMode !== null) {
