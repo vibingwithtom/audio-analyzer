@@ -29,17 +29,11 @@ export default defineConfig({
       'tests/components/StatusBadge.test.ts',
       'tests/components/TabNavigation.test.ts',
       'tests/components/TestComponent.test.ts',
-      'tests/components/ValidationDisplay.test.ts',
-      // Exclude Phase 2 component tests in CI (pass 100% locally, fail in CI)
-      // Issue: componentApi: 4 compatibility mode causes createElement to return
-      // plain Objects in both jsdom and happy-dom CI environments.
-      // Tests work perfectly locally - run with: npm test tests/components/
-      // TODO: Re-enable when componentApi: 4 is no longer needed or we migrate to
-      // vitest-browser-svelte (requires Vitest 4.x stable)
-      'tests/components/LocalFileTab.test.ts',
-      'tests/components/ResultsDisplay.test.ts',
-      'tests/components/ResultsTable.test.ts',
-      'tests/components/SettingsTab.test.ts'
+      'tests/components/ValidationDisplay.test.ts'
+      // Phase 2 component tests (LocalFileTab, ResultsDisplay, ResultsTable, SettingsTab)
+      // pass 100% locally but fail in CI due to componentApi: 4 compatibility mode.
+      // They are excluded from CI in package.json but can be run locally with:
+      // npm test tests/components/LocalFileTab.test.ts (etc)
     ],
     // Limit parallelism to reduce memory usage
     pool: 'forks',
