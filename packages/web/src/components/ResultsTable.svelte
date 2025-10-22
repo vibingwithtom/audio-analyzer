@@ -830,7 +830,7 @@
         </thead>
         <tbody>
           {#each results as result, index (`${result.filename}-${index}`)}
-            {@const rowStatus = (result as any).computedStatus || getExperimentalRowStatus(result)}
+            {@const rowStatus = getExperimentalRowStatus(result)}
             <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
               <td>
                 {result.filename}
@@ -1298,7 +1298,7 @@
     </thead>
     <tbody>
       {#each results as result, index (`${result.filename}-${index}`)}
-        {@const rowStatus = (result as any).computedStatus || getAudioOnlyStatus(result)}
+        {@const rowStatus = getAudioOnlyStatus(result)}
         <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
           <td
             class:validation-pass={getValidationStatus(result, 'filename') === 'pass'}
