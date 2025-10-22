@@ -10,18 +10,23 @@ describe('FileUpload', () => {
     expect(input.getAttribute('type')).toBe('file');
   });
 
-  it('should dispatch file when selected', async () => {
-    const { getByLabelText, component } = render(FileUpload, { props: { id: 'test-upload' } });
+  it('should call onChange callback when file selected', async () => {
+    const onChange = vi.fn();
+    const { getByLabelText } = render(FileUpload, {
+      props: {
+        id: 'test-upload',
+        onChange
+      }
+    });
     const input = getByLabelText(/upload/i);
 
     const file = new File(['test'], 'test.wav', { type: 'audio/wav' });
 
-    const mock = vi.fn();
-    component.$on('change', mock);
-
     await fireEvent.change(input, { target: { files: [file] } });
 
-    expect(mock).toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalled();
+    const event = onChange.mock.calls[0][0];
+    expect(event.target).toBe(input);
   });
 
   it('should show processing state', () => {
