@@ -28,16 +28,13 @@ const workingMethods = HTMLElementProto ? {
 console.log('[SETUP] HTMLElement.prototype available:', !!HTMLElementProto);
 console.log('[SETUP] Captured methods from prototype:', Object.keys(workingMethods).filter(k => workingMethods[k]));
 
-// Create a container div for creating real elements via innerHTML
-let realElementContainer = null;
+// Create a fresh document context for creating real elements
+let freshDocument = null;
 try {
-  realElementContainer = originalCreateElement.call(document, 'div');
-  if (!realElementContainer.appendChild) {
-    // If even the initial container is broken, try using document.body
-    realElementContainer = document.body;
-  }
+  freshDocument = document.implementation?.createHTMLDocument?.('temp');
+  console.log('[SETUP] Fresh document created:', !!freshDocument);
 } catch (e) {
-  realElementContainer = document.body;
+  console.log('[SETUP] Failed to create fresh document:', e.message);
 }
 
 // ALWAYS wrap createElement to protect against later breakage
@@ -49,26 +46,25 @@ document.createElement = function(tagName: string, options?: any) {
   if (!element.appendChild) {
     console.log('[CREATEELEMENT] Broken element detected, creating real element:', tagName);
 
-    // Create a real DOM element using innerHTML on a real container
-    try {
-      if (realElementContainer) {
-        console.log('[CREATEELEMENT] Container exists:', !!realElementContainer, 'hasAppendChild:', !!realElementContainer.appendChild);
-        realElementContainer.innerHTML = `<${tagName}></${tagName}>`;
-        const realElement = realElementContainer.firstChild;
-        console.log('[CREATEELEMENT] innerHTML created element:', !!realElement, 'constructor:', realElement?.constructor?.name, 'hasAppendChild:', !!realElement?.appendChild);
-        realElementContainer.innerHTML = ''; // Clean up
+    // Try using fresh document to create a real element
+    if (freshDocument) {
+      try {
+        const realElement = freshDocument.createElement(tagName);
+        console.log('[CREATEELEMENT] Fresh doc element created:', !!realElement, 'constructor:', realElement?.constructor?.name, 'hasAppendChild:', !!realElement?.appendChild);
 
         if (realElement && realElement.appendChild) {
-          console.log('[CREATEELEMENT] Created real element successfully');
-          return realElement;
-        } else {
-          console.log('[CREATEELEMENT] innerHTML element missing appendChild, cannot use');
+          // Import the element into the main document's context
+          const importedElement = document.importNode(realElement, true);
+          console.log('[CREATEELEMENT] Imported element:', !!importedElement, 'hasAppendChild:', !!importedElement?.appendChild);
+
+          if (importedElement && importedElement.appendChild) {
+            console.log('[CREATEELEMENT] Created real element successfully via fresh document');
+            return importedElement;
+          }
         }
-      } else {
-        console.log('[CREATEELEMENT] No container available');
+      } catch (e) {
+        console.log('[CREATEELEMENT] Failed to create via fresh document:', e.message);
       }
-    } catch (e) {
-      console.log('[CREATEELEMENT] Failed to create via innerHTML:', e.message);
     }
 
     // Fallback: Try to make the broken element work by adding methods
