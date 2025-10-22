@@ -3,20 +3,22 @@
   import type { AudioCriteria } from '../settings/types';
 
   // Custom criteria form state
-  let customFileTypes: string[] = [];
-  let customSampleRates: string[] = [];
-  let customBitDepths: string[] = [];
-  let customChannels: string[] = [];
-  let customMinDuration: string = '';
+  let customFileTypes = $state<string[]>([]);
+  let customSampleRates = $state<string[]>([]);
+  let customBitDepths = $state<string[]>([]);
+  let customChannels = $state<string[]>([]);
+  let customMinDuration = $state('');
 
   // Load custom criteria when switching to custom preset
-  $: if ($currentPresetId === 'custom' && $currentCriteria) {
-    customFileTypes = $currentCriteria.fileType || [];
-    customSampleRates = $currentCriteria.sampleRate || [];
-    customBitDepths = $currentCriteria.bitDepth || [];
-    customChannels = $currentCriteria.channels || [];
-    customMinDuration = $currentCriteria.minDuration || '';
-  }
+  $effect(() => {
+    if ($currentPresetId === 'custom' && $currentCriteria) {
+      customFileTypes = $currentCriteria.fileType || [];
+      customSampleRates = $currentCriteria.sampleRate || [];
+      customBitDepths = $currentCriteria.bitDepth || [];
+      customChannels = $currentCriteria.channels || [];
+      customMinDuration = $currentCriteria.minDuration || '';
+    }
+  });
 
   function handlePresetChange(event: Event) {
     const select = event.target as HTMLSelectElement;
@@ -59,12 +61,12 @@
   }
 
   // Get preset entries sorted
-  $: presetEntries = Object.entries(availablePresets).sort((a, b) => {
+  let presetEntries = $derived(Object.entries(availablePresets).sort((a, b) => {
     // Put "Custom" at the end
     if (a[0] === 'custom') return 1;
     if (b[0] === 'custom') return -1;
     return a[1].name.localeCompare(b[1].name);
-  });
+  }));
 </script>
 
 <style>
@@ -442,7 +444,7 @@
       <select
         id="preset-select"
         value={$currentPresetId}
-        on:change={handlePresetChange}
+        onchange={handlePresetChange}
       >
         <!-- Auditions Group -->
         <option value="auditions-bilingual-partner">{availablePresets['auditions-bilingual-partner'].name}</option>
@@ -594,7 +596,7 @@
               id="custom-file-type"
               multiple
               bind:value={customFileTypes}
-              on:change={(e) => handleMultiSelect(e, 'fileType')}
+              onchange={(e) => handleMultiSelect(e, 'fileType')}
             >
               {#each fileTypeOptions as fileType}
                 <option value={fileType}>{fileType.toUpperCase()}</option>
@@ -610,7 +612,7 @@
               id="custom-sample-rate"
               multiple
               bind:value={customSampleRates}
-              on:change={(e) => handleMultiSelect(e, 'sampleRate')}
+              onchange={(e) => handleMultiSelect(e, 'sampleRate')}
             >
               {#each sampleRateOptions as rate}
                 <option value={rate}>{parseInt(rate) / 1000} kHz</option>
@@ -626,7 +628,7 @@
               id="custom-bit-depth"
               multiple
               bind:value={customBitDepths}
-              on:change={(e) => handleMultiSelect(e, 'bitDepth')}
+              onchange={(e) => handleMultiSelect(e, 'bitDepth')}
             >
               {#each bitDepthOptions as depth}
                 <option value={depth}>{depth}-bit</option>
@@ -642,7 +644,7 @@
               id="custom-channels"
               multiple
               bind:value={customChannels}
-              on:change={(e) => handleMultiSelect(e, 'channels')}
+              onchange={(e) => handleMultiSelect(e, 'channels')}
             >
               {#each channelOptions as channel}
                 <option value={channel}>
@@ -662,7 +664,7 @@
               min="0"
               placeholder="e.g., 120 for 2 minutes"
               bind:value={customMinDuration}
-              on:input={handleDurationChange}
+              oninput={handleDurationChange}
             />
             <span class="field-hint">Leave empty for no minimum duration requirement</span>
           </div>
@@ -689,7 +691,7 @@
         <button
           class="toggle-switch"
           class:active={$enableIncludeFailureAnalysis}
-          on:click={() => setIncludeFailureAnalysis(!$enableIncludeFailureAnalysis)}
+          onclick={() => setIncludeFailureAnalysis(!$enableIncludeFailureAnalysis)}
           aria-label="Toggle failure analysis"
           aria-pressed={$enableIncludeFailureAnalysis}
         ></button>
@@ -704,7 +706,7 @@
         <button
           class="toggle-switch"
           class:active={$enableIncludeRecommendations}
-          on:click={() => setIncludeRecommendations(!$enableIncludeRecommendations)}
+          onclick={() => setIncludeRecommendations(!$enableIncludeRecommendations)}
           aria-label="Toggle recommendations"
           aria-pressed={$enableIncludeRecommendations}
         ></button>
@@ -735,7 +737,7 @@
       <button
         class="toggle-switch"
         class:active={$peakDetectionMode === 'fast'}
-        on:click={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
+        onclick={() => setPeakDetectionMode($peakDetectionMode === 'fast' ? 'accurate' : 'fast')}
         aria-label="Toggle peak detection mode"
         aria-pressed={$peakDetectionMode === 'fast'}
       ></button>

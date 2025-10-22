@@ -16,7 +16,6 @@
   }
 </script>
 
-<!-- Use scoped styles by default -->
 <style>
   .tabs {
     display: flex;
@@ -60,7 +59,7 @@
   <button
     class="tab-button"
     class:active={$currentTab === 'local'}
-    on:click={() => handleTabClick('local')}
+    onclick={() => handleTabClick('local')}
     aria-current={$currentTab === 'local' ? 'page' : undefined}
   >
     📁 Local Files
@@ -70,7 +69,7 @@
     <button
       class="tab-button"
       class:active={$currentTab === 'googleDrive'}
-      on:click={() => handleTabClick('googleDrive')}
+      onclick={() => handleTabClick('googleDrive')}
       aria-current={$currentTab === 'googleDrive' ? 'page' : undefined}
     >
       ☁️ Google Drive
@@ -78,7 +77,7 @@
     <button
       class="tab-button"
       class:active={$currentTab === 'box'}
-      on:click={() => handleTabClick('box')}
+      onclick={() => handleTabClick('box')}
       aria-current={$currentTab === 'box' ? 'page' : undefined}
     >
       📦 Box
@@ -86,7 +85,7 @@
     <button
       class="tab-button"
       class:active={$currentTab === 'settings'}
-      on:click={() => handleTabClick('settings')}
+      onclick={() => handleTabClick('settings')}
       aria-current={$currentTab === 'settings' ? 'page' : undefined}
     >
       ⚙️ Settings

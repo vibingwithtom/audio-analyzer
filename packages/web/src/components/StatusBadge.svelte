@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let status: 'pass' | 'fail' | 'warning' | 'error';
+  let { status }: { status: 'pass' | 'fail' | 'warning' | 'error' } = $props();
 
   const badgeConfig = {
     pass: { icon: '✓', class: 'badge-success', text: 'Pass' },
@@ -8,7 +8,7 @@
     error: { icon: '✗', class: 'badge-danger', text: 'Error' }
   };
 
-  $: config = badgeConfig[status] || badgeConfig.error;
+  let config = $derived(badgeConfig[status] || badgeConfig.error);
 </script>
 
 <style>
