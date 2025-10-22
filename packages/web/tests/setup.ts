@@ -52,14 +52,20 @@ document.createElement = function(tagName: string, options?: any) {
     // Create a real DOM element using innerHTML on a real container
     try {
       if (realElementContainer) {
+        console.log('[CREATEELEMENT] Container exists:', !!realElementContainer, 'hasAppendChild:', !!realElementContainer.appendChild);
         realElementContainer.innerHTML = `<${tagName}></${tagName}>`;
         const realElement = realElementContainer.firstChild;
+        console.log('[CREATEELEMENT] innerHTML created element:', !!realElement, 'constructor:', realElement?.constructor?.name, 'hasAppendChild:', !!realElement?.appendChild);
         realElementContainer.innerHTML = ''; // Clean up
 
         if (realElement && realElement.appendChild) {
           console.log('[CREATEELEMENT] Created real element successfully');
           return realElement;
+        } else {
+          console.log('[CREATEELEMENT] innerHTML element missing appendChild, cannot use');
         }
+      } else {
+        console.log('[CREATEELEMENT] No container available');
       }
     } catch (e) {
       console.log('[CREATEELEMENT] Failed to create via innerHTML:', e.message);
