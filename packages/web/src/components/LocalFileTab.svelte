@@ -247,10 +247,8 @@
     }
   }
 
-  async function handleFileChange(event: CustomEvent) {
-    // Get the original event from the CustomEvent detail
-    const originalEvent = event.detail as Event;
-    const inputElement = originalEvent.target as HTMLInputElement;
+  async function handleFileChange(event: Event) {
+    const inputElement = event.target as HTMLInputElement;
     const files = inputElement?.files;
 
     if (!files || files.length === 0) return;
