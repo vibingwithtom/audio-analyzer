@@ -1253,6 +1253,14 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
+  .analysis-mode-section legend {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary, #333333);
+    padding: 0 0.25rem;
+    margin-bottom: 1rem;
+  }
+
   .analysis-mode-section h3 {
     margin: 0 0 1rem 0;
     font-size: 0.95rem;
@@ -1508,13 +1516,13 @@
     <div class="auth-section">
       <h3>Google Drive:</h3>
       <span class="user-email">✓ {$authState.google.userInfo?.email}</span>
-      <button class="secondary" on:click={handleSignOut}>Sign Out</button>
+      <button class="secondary" on:click={handleSignOut} aria-label="Sign out from Google Drive">Sign Out</button>
     </div>
   {:else}
     <div class="auth-section signed-out">
       <h3>Google Drive Authentication</h3>
       <p>Sign in to access your Google Drive files</p>
-      <button on:click={handleSignIn}>Sign in with Google</button>
+      <button on:click={handleSignIn} aria-label="Sign in with your Google account">Sign in with Google</button>
     </div>
   {/if}
 
@@ -1523,13 +1531,13 @@
     {#if !$hasValidPresetConfig}
       <div class="no-preset-warning">
         <span>Please select a Preset or configure Custom criteria to analyze files.</span>
-        <a href="#" on:click|preventDefault={goToSettings}>Select Preset</a>
+        <a href="#" role="button" aria-label="Open settings to select a preset" on:click|preventDefault={goToSettings}>Select Preset</a>
       </div>
     {:else if $currentPresetId}
       <div class="current-preset">
         <span class="preset-label">Current Preset:</span>
         <span class="preset-name" on:click={goToSettings}>{availablePresets[$currentPresetId]?.name || $currentPresetId}</span>
-        <a href="#" on:click|preventDefault={goToSettings}>Change</a>
+        <a href="#" role="button" aria-label="Open settings to change preset" on:click|preventDefault={goToSettings}>Change</a>
       </div>
     {/if}
 
@@ -1545,10 +1553,10 @@
             disabled={processing || !$hasValidPresetConfig}
             on:keydown={(e) => e.key === 'Enter' && !processing && fileUrl.trim() && $hasValidPresetConfig && handleUrlSubmit()}
           />
-          <button on:click={handleUrlSubmit} disabled={processing || !fileUrl.trim() || !$hasValidPresetConfig}>
+          <button on:click={handleUrlSubmit} disabled={processing || !fileUrl.trim() || !$hasValidPresetConfig} aria-label="Analyze the pasted Google Drive URL">
             Analyze URL
           </button>
-          <button class="browse-drive-button" on:click={handleBrowseDrive} disabled={processing || pickerLoading || !$hasValidPresetConfig}>
+          <button class="browse-drive-button" on:click={handleBrowseDrive} disabled={processing || pickerLoading || !$hasValidPresetConfig} aria-label="Browse Google Drive for files or folders">
             {#if pickerLoading}
               🔄 Loading Picker...
             {:else}
@@ -1561,8 +1569,8 @@
 
     <!-- Analysis Mode Selection (only for presets with filename validation) -->
     {#if $currentPresetId && availablePresets[$currentPresetId]?.supportsFilenameValidation}
-      <div class="analysis-mode-section">
-        <h3>Analysis Mode:</h3>
+      <fieldset class="analysis-mode-section">
+        <legend>Analysis Mode:</legend>
         <div class="radio-group">
           <label class="radio-label">
             <input
@@ -1665,31 +1673,45 @@
             </div>
           </div>
         {/if}
-      </div>
+      </fieldset>
     {/if}
 
     <!-- Unified Progress Bar -->
     {#if analysisProgress.visible}
-      <div class="analysis-progress">
+      <div class="analysis-progress" role="status" aria-live="polite" aria-label="File analysis progress">
         {#if analysisProgress.batchTotal > 1}
           <!-- Batch mode: Show file count and current file progress -->
-          <div class="batch-counter">
+          <div class="batch-counter" aria-live="assertive">
             Processing file {analysisProgress.batchCurrent} of {analysisProgress.batchTotal}
           </div>
-          <div class="progress-filename">{analysisProgress.filename}</div>
+          <div class="progress-filename" aria-live="polite">{analysisProgress.filename}</div>
           <div class="progress-message">{analysisProgress.message} ({Math.round(analysisProgress.progress * 100)}%)</div>
-          <div class="progress-bar">
+          <div
+            class="progress-bar"
+            role="progressbar"
+            aria-valuenow={Math.round(analysisProgress.progress * 100)}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label={`${analysisProgress.filename} analysis progress: ${Math.round(analysisProgress.progress * 100)}%`}
+          >
             <div class="progress-fill" style="width: {analysisProgress.progress * 100}%"></div>
           </div>
         {:else}
           <!-- Single file mode: Show only file progress -->
-          <div class="progress-filename">{analysisProgress.filename}</div>
+          <div class="progress-filename" aria-live="polite">{analysisProgress.filename}</div>
           <div class="progress-message">{analysisProgress.message} ({Math.round(analysisProgress.progress * 100)}%)</div>
-          <div class="progress-bar">
+          <div
+            class="progress-bar"
+            role="progressbar"
+            aria-valuenow={Math.round(analysisProgress.progress * 100)}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label={`${analysisProgress.filename} analysis progress: ${Math.round(analysisProgress.progress * 100)}%`}
+          >
             <div class="progress-fill" style="width: {analysisProgress.progress * 100}%"></div>
           </div>
         {/if}
-        <button class="cancel-button" on:click={handleCancel} disabled={analysisProgress.cancelling}>
+        <button class="cancel-button" on:click={handleCancel} disabled={analysisProgress.cancelling} aria-label="Cancel file analysis">
           {analysisProgress.cancelling ? 'Cancelling...' : 'Cancel Analysis'}
         </button>
       </div>
