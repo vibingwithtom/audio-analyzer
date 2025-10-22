@@ -25,8 +25,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Testing Requirements
 - All feature branches run CI automatically (tests, TypeScript checks, linting)
-- **768 tests must pass** before any code reaches production
+- **1126+ tests must pass in CI** before any code reaches production
 - If tests fail on your feature branch, fix them before creating a PR
+
+### Component Tests (Local Development Only)
+**135 component tests are excluded from CI but available for local testing:**
+
+```bash
+# Run all component tests locally (pass 100% locally, fail in CI)
+npm test tests/components/LocalFileTab.test.ts
+npm test tests/components/ResultsDisplay.test.ts
+npm test tests/components/ResultsTable.test.ts
+npm test tests/components/SettingsTab.test.ts
+```
+
+**Why excluded from CI:**
+- Tests fail in CI due to incompatibility between Svelte 5's `componentApi: 4` compatibility mode and DOM emulation libraries (jsdom/happy-dom)
+- `createElement` returns plain Objects instead of DOM elements in CI environment
+- Tests work perfectly locally - use them during development!
+
+**See:** `packages/web/CI_TESTING_ISSUE.md` for full technical investigation
+
+**Will re-enable when:**
+- `componentApi: 4` is no longer needed (full Svelte 5 migration)
+- Vitest 4.x stable is released (for `vitest-browser-svelte`)
+- Time allows for comprehensive solution
 
 ### When to Update Test Mocks
 - **Critical**: When adding new methods to classes imported by tests (e.g., LevelAnalyzer)
