@@ -28,42 +28,56 @@ const workingMethods = HTMLElementProto ? {
 console.log('[SETUP] HTMLElement.prototype available:', !!HTMLElementProto);
 console.log('[SETUP] Captured methods from prototype:', Object.keys(workingMethods).filter(k => workingMethods[k]));
 
+// Create a container div for creating real elements via innerHTML
+let realElementContainer = null;
+try {
+  realElementContainer = originalCreateElement.call(document, 'div');
+  if (!realElementContainer.appendChild) {
+    // If even the initial container is broken, try using document.body
+    realElementContainer = document.body;
+  }
+} catch (e) {
+  realElementContainer = document.body;
+}
+
 // ALWAYS wrap createElement to protect against later breakage
 // @ts-ignore - Override createElement to ensure all elements work
 document.createElement = function(tagName: string, options?: any) {
   const element = originalCreateElement.call(document, tagName, options);
 
-  // If element lacks appendChild, manually add DOM methods from captured working versions
+  // If element lacks appendChild, it's a broken plain Object - create a real one instead
   if (!element.appendChild) {
-    console.log('[CREATEELEMENT] Fixing broken element:', tagName);
+    console.log('[CREATEELEMENT] Broken element detected, creating real element:', tagName);
 
-    // Directly bind the captured methods to this element
-    if (workingMethods.appendChild) {
-      element.appendChild = workingMethods.appendChild.bind(element);
-    }
-    if (workingMethods.removeChild) {
-      element.removeChild = workingMethods.removeChild.bind(element);
-    }
-    if (workingMethods.insertBefore) {
-      element.insertBefore = workingMethods.insertBefore.bind(element);
-    }
-    if (workingMethods.replaceChild) {
-      element.replaceChild = workingMethods.replaceChild.bind(element);
-    }
-    if (workingMethods.cloneNode) {
-      element.cloneNode = workingMethods.cloneNode.bind(element);
-    }
-    if (workingMethods.contains) {
-      element.contains = workingMethods.contains.bind(element);
+    // Create a real DOM element using innerHTML on a real container
+    try {
+      if (realElementContainer) {
+        realElementContainer.innerHTML = `<${tagName}></${tagName}>`;
+        const realElement = realElementContainer.firstChild;
+        realElementContainer.innerHTML = ''; // Clean up
+
+        if (realElement && realElement.appendChild) {
+          console.log('[CREATEELEMENT] Created real element successfully');
+          return realElement;
+        }
+      }
+    } catch (e) {
+      console.log('[CREATEELEMENT] Failed to create via innerHTML:', e.message);
     }
 
-    // Add missing properties
+    // Fallback: Try to make the broken element work by adding methods
+    console.log('[CREATEELEMENT] Fallback: Adding methods to broken element');
+    if (workingMethods.appendChild) element.appendChild = workingMethods.appendChild.bind(element);
+    if (workingMethods.removeChild) element.removeChild = workingMethods.removeChild.bind(element);
+    if (workingMethods.insertBefore) element.insertBefore = workingMethods.insertBefore.bind(element);
+    if (workingMethods.replaceChild) element.replaceChild = workingMethods.replaceChild.bind(element);
+    if (workingMethods.cloneNode) element.cloneNode = workingMethods.cloneNode.bind(element);
+    if (workingMethods.contains) element.contains = workingMethods.contains.bind(element);
+
     if (!element.childNodes) element.childNodes = [];
     if (!element.children) element.children = [];
-    if (element.nodeType === undefined) element.nodeType = 1; // ELEMENT_NODE
+    if (element.nodeType === undefined) element.nodeType = 1;
     if (!element.ownerDocument) element.ownerDocument = document;
-
-    console.log('[CREATEELEMENT] Fixed - appendChild exists:', !!element.appendChild);
   }
 
   return element;
