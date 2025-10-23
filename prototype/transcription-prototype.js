@@ -134,7 +134,14 @@ async function transcribeAudio(audioPath, scriptPath) {
   try {
     // Decode audio to Float32Array using ffmpeg
     const audioData = await decodeAudio(audioPath);
-    const result = await recognizer(audioData);
+
+    // Transcribe with chunking for long audio (>30 seconds)
+    // chunk_length_s: 30 seconds per chunk
+    // stride_length_s: 5 seconds overlap between chunks
+    const result = await recognizer(audioData, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+    });
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
 
