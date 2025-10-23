@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisper Transcription Prototype</title>
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0/dist/transformers.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -414,27 +414,27 @@
     </div>
 
     <script>
-        const Transformers = window.Transformers;
-        let extractor = null;
-        let processor = null;
         let model = null;
 
         // Initialize Whisper model
         async function initializeModel() {
             try {
+                // Wait for Transformers library to load
+                if (!window.transformers || !window.transformers.pipeline) {
+                    throw new Error('Transformers.js library failed to load. Please refresh the page and try again.');
+                }
+
                 const statusEl = document.getElementById('modelStatus');
                 const progressEl = document.getElementById('modelProgress');
 
                 statusEl.innerHTML = '<strong>Model Status:</strong> Loading Whisper model...<div class="progress-bar"><div class="progress-fill" id="modelProgress"></div></div>';
 
-                // Set up progress callback
-                Transformers.env.allowLocalModels = false;
-                Transformers.env.allowRemoteModels = true;
-
-                const pipe = await Transformers.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
+                const pipe = await window.transformers.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
                     quantized: true, // Use quantized version for speed
                     progress_callback: (progress) => {
-                        progressEl.style.width = (progress.progress * 100) + '%';
+                        const percent = Math.round(progress.progress * 100);
+                        progressEl.style.width = percent + '%';
+                        statusEl.innerHTML = `<strong>Model Status:</strong> Loading Whisper model (${percent}%)...<div class="progress-bar"><div class="progress-fill" id="modelProgress" style="width: ${percent}%;"></div></div>`;
                     }
                 });
 
@@ -451,6 +451,8 @@
 
         // Initialize model on page load
         window.addEventListener('load', async () => {
+            // Give the script a moment to fully load
+            await new Promise(resolve => setTimeout(resolve, 500));
             model = await initializeModel();
         });
 
@@ -523,6 +525,11 @@
         async function transcribeAudio() {
             const audioInput = document.getElementById('audioInput');
             const scriptInput = document.getElementById('scriptInput');
+
+            if (!model) {
+                showStatus('Model is still loading. Please wait...', 'warning');
+                return;
+            }
 
             if (!audioInput.files[0]) {
                 showStatus('Please select an audio file', 'error');
