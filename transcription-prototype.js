@@ -15,6 +15,8 @@
 import { pipeline } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
+import ffmpeg from 'fluent-ffmpeg';
+import { exec } from 'child_process';
 
 // String similarity function
 function stringSimilarity(a, b) {
@@ -71,6 +73,35 @@ function calculateWordAccuracy(transcribed, reference) {
   return (matches / refWords.length) * 100;
 }
 
+// Decode audio file to Float32Array using ffmpeg
+async function decodeAudio(audioPath) {
+  return new Promise((resolve, reject) => {
+    const tempFile = `/tmp/audio_decoded_${Date.now()}.raw`;
+
+    ffmpeg(audioPath)
+      .audioFrequency(16000) // Whisper expects 16kHz
+      .audioChannels(1) // Mono
+      .audioCodec('pcm_f32le') // Float32 little-endian
+      .format('f32le')
+      .pipe(fs.createWriteStream(tempFile))
+      .on('end', () => {
+        try {
+          const buffer = fs.readFileSync(tempFile);
+          const float32Array = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+          fs.unlinkSync(tempFile);
+          resolve(float32Array);
+        } catch (error) {
+          fs.unlinkSync(tempFile);
+          reject(error);
+        }
+      })
+      .on('error', (err) => {
+        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+        reject(new Error(`FFmpeg error: ${err.message}`));
+      });
+  });
+}
+
 // Main transcription function
 async function transcribeAudio(audioPath, scriptPath) {
   // Validate files exist
@@ -101,14 +132,14 @@ async function transcribeAudio(audioPath, scriptPath) {
     process.exit(1);
   }
 
-  // Transcribe
-  console.log('🎤 Transcribing audio...\n');
+  // Decode and transcribe
+  console.log('🎤 Decoding audio and transcribing...\n');
   const startTime = performance.now();
 
   try {
-    // Read audio file as buffer for Node.js environment
-    const audioBuffer = fs.readFileSync(audioPath);
-    const result = await recognizer(audioBuffer);
+    // Decode audio to Float32Array using ffmpeg
+    const audioData = await decodeAudio(audioPath);
+    const result = await recognizer(audioData);
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
 
