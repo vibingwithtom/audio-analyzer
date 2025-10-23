@@ -98,7 +98,7 @@ async function decodeAudio(audioPath) {
 }
 
 // Main transcription function
-async function transcribeAudio(audioPath, scriptPath) {
+async function transcribeAudio(audioPath, scriptPath, language = null) {
   // Validate files exist
   if (!fs.existsSync(audioPath)) {
     console.error(`❌ Error: Audio file not found: ${audioPath}`);
@@ -113,6 +113,9 @@ async function transcribeAudio(audioPath, scriptPath) {
   console.log(`📄 Audio file: ${path.basename(audioPath)}`);
   if (scriptText) {
     console.log(`📝 Reference script: ${path.basename(scriptPath)}`);
+  }
+  if (language) {
+    console.log(`🌐 Language: ${language}`);
   }
 
   // Initialize model
@@ -138,10 +141,17 @@ async function transcribeAudio(audioPath, scriptPath) {
     // Transcribe with chunking for long audio (>30 seconds)
     // chunk_length_s: 30 seconds per chunk
     // stride_length_s: 5 seconds overlap between chunks
-    const result = await recognizer(audioData, {
+    const transcribeOptions = {
       chunk_length_s: 30,
       stride_length_s: 5,
-    });
+    };
+
+    // Add language if specified (e.g., "tr" for Turkish, "es" for Spanish)
+    if (language) {
+      transcribeOptions.language = language;
+    }
+
+    const result = await recognizer(audioData, transcribeOptions);
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
 
@@ -211,6 +221,7 @@ async function transcribeAudio(audioPath, scriptPath) {
       timestamp: new Date().toISOString(),
       audioFile: path.basename(audioPath),
       scriptFile: scriptPath ? path.basename(scriptPath) : null,
+      language: language || 'auto-detected',
       processingTime,
       estimatedDuration: parseFloat(estimatedDuration),
       fileSizeMB: parseFloat(fileSizeMB),
@@ -237,17 +248,23 @@ const args = process.argv.slice(2);
 
 if (args.length === 0) {
   console.log(`\n🎙️  Audio Transcription Prototype\n`);
-  console.log('Usage: node transcription-prototype.js <audio-file> [script-file]\n');
+  console.log('Usage: node transcription-prototype.js <audio-file> [script-file] [language]\n');
   console.log('Examples:');
   console.log('  node transcription-prototype.js recording.wav');
-  console.log('  node transcription-prototype.js recording.wav script.txt\n');
+  console.log('  node transcription-prototype.js recording.wav script.txt');
+  console.log('  node transcription-prototype.js recording.wav script.txt tr\n');
+  console.log('Common language codes:');
+  console.log('  en - English       es - Spanish        fr - French');
+  console.log('  de - German        it - Italian        pt - Portuguese');
+  console.log('  tr - Turkish       ja - Japanese       zh - Chinese\n');
   process.exit(0);
 }
 
 const audioFile = args[0];
 const scriptFile = args[1] || null;
+const language = args[2] || null;
 
-transcribeAudio(audioFile, scriptFile)
+transcribeAudio(audioFile, scriptFile, language)
   .then(() => {
     console.log('Process completed successfully');
     process.exit(0);
