@@ -149,11 +149,22 @@ async function transcribeAudio(audioPath, scriptPath, language = null) {
     // Add language if specified (e.g., "tr" for Turkish, "es" for Spanish)
     if (language) {
       transcribeOptions.language = language;
+      console.log(`   Using language hint: ${language}`);
     }
+
+    console.log(`   Transcription options:`, JSON.stringify(transcribeOptions, null, 2));
 
     const result = await recognizer(audioData, transcribeOptions);
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
+
+    // Log detected language from result
+    console.log(`   Result object keys:`, Object.keys(result));
+    if (result.language) {
+      console.log(`   ✓ Detected language: ${result.language}`);
+    } else {
+      console.log(`   ⚠ No language info in result`);
+    }
 
     const transcribedText = result.text;
     const fileSize = fs.statSync(audioPath).size;
