@@ -15,8 +15,7 @@
 import { pipeline } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
-import ffmpeg from 'fluent-ffmpeg';
-import { exec } from 'child_process';
+import { execSync } from 'child_process';
 
 // String similarity function
 function stringSimilarity(a, b) {
@@ -75,38 +74,27 @@ function calculateWordAccuracy(transcribed, reference) {
 
 // Decode audio file to Float32Array using ffmpeg
 async function decodeAudio(audioPath) {
-  return new Promise((resolve, reject) => {
-    const tempFile = `/tmp/audio_decoded_${Date.now()}.raw`;
-    console.log(`   Decoding to: ${tempFile}`);
+  const tempFile = `/tmp/audio_decoded_${Date.now()}.raw`;
+  console.log(`   Decoding audio...`);
 
-    ffmpeg(audioPath)
-      .audioFrequency(16000) // Whisper expects 16kHz
-      .audioChannels(1) // Mono
-      .audioCodec('pcm_f32le') // Float32 little-endian
-      .format('f32le')
-      .on('start', (cmd) => {
-        console.log(`   FFmpeg command: ${cmd}`);
-      })
-      .pipe(fs.createWriteStream(tempFile), { end: true })
-      .on('end', () => {
-        try {
-          console.log(`   ✓ Audio decoded successfully`);
-          const buffer = fs.readFileSync(tempFile);
-          const float32Array = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
-          console.log(`   ✓ Converted to Float32Array (${float32Array.length} samples)`);
-          fs.unlinkSync(tempFile);
-          resolve(float32Array);
-        } catch (error) {
-          if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-          reject(error);
-        }
-      })
-      .on('error', (err) => {
-        console.log(`   ✗ FFmpeg error: ${err.message}`);
-        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-        reject(new Error(`FFmpeg error: ${err.message}`));
-      });
-  });
+  try {
+    // Use ffmpeg to decode audio to raw PCM float32
+    const command = `ffmpeg -i "${audioPath}" -ar 16000 -ac 1 -acodec pcm_f32le -f f32le "${tempFile}" 2>/dev/null`;
+    console.log(`   Running: ffmpeg -i "${path.basename(audioPath)}" -ar 16000 -ac 1 -acodec pcm_f32le...`);
+
+    execSync(command, { stdio: 'pipe' });
+
+    console.log(`   ✓ Audio decoded successfully`);
+    const buffer = fs.readFileSync(tempFile);
+    const float32Array = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+    console.log(`   ✓ Converted to Float32Array (${float32Array.length} samples)`);
+
+    fs.unlinkSync(tempFile);
+    return float32Array;
+  } catch (error) {
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    throw new Error(`Failed to decode audio: ${error.message}`);
+  }
 }
 
 // Main transcription function
