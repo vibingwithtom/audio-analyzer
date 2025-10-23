@@ -106,7 +106,9 @@ async function transcribeAudio(audioPath, scriptPath) {
   const startTime = performance.now();
 
   try {
-    const result = await recognizer(audioPath);
+    // Read audio file as buffer for Node.js environment
+    const audioBuffer = fs.readFileSync(audioPath);
+    const result = await recognizer(audioBuffer);
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
 
