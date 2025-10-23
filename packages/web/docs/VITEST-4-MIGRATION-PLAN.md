@@ -1,21 +1,51 @@
 # Vitest 4 Upgrade Migration Plan
 
-**Status:** In Progress
+**Status:** ⚠️ BLOCKED - Requires Significant Refactoring
 **Branch:** `feature/upgrade-vitest-4`
 **Date:** 2025-10-23
+**Last Updated:** 2025-10-23 (After attempting upgrade)
 
 ## Overview
 Upgrade Vitest from v3.2.4 to v4.0.1, including related packages and configuration updates.
 
 ## Risk Assessment Summary
 
-### Breaking Changes Identified
-1. **Configuration syntax change** (REQUIRED): `poolOptions.forks.singleFork` → `maxWorkers: 1`
-2. **V8 coverage provider overhaul**: More accurate AST-based remapping (coverage numbers will change)
-3. **Mock behavior changes**: `vi.restoreAllMocks()` no longer resets automocks (low impact - we use manual mocks)
+### ⚠️ CRITICAL FINDINGS FROM UPGRADE ATTEMPT
+
+**Status:** Upgrade attempt revealed **130 failing tests (out of 1225)** when upgrading from Vitest 3.2.4 to 4.0.1.
+
+### Root Cause: Arrow Function Constructor Mocking
+Vitest 4 introduced stricter handling of constructor mocks. The breaking change affects mock factories that use arrow functions:
+
+```javascript
+// This pattern breaks in Vitest 4:
+vi.mock('@package/module', () => ({
+  default: (content, options) => ({  // ❌ Arrow function causes "not a constructor" error
+    size: 1024
+  })
+}))
+
+// Vitest 4 requires:
+vi.mock('@package/module', () => ({
+  default: function(content, options) {  // ✅ Regular function
+    return { size: 1024 }
+  }
+}))
+```
+
+### Affected Areas
+- **export-enhanced.test.js**: 14+ failures from arrow function factory mocks
+- **Multiple test files**: Using arrow function mocks in `vi.mock()` factory functions
+- **scope**: ~130 tests across 6 test suites
+
+### Breaking Changes Confirmed
+1. **Configuration syntax change** (REQUIRED): `poolOptions.forks.singleFork` → `maxWorkers: 1` ✅
+2. **V8 coverage provider overhaul**: More accurate AST-based remapping ✅
+3. **Mock behavior - Arrow Functions**: Arrow functions in factory functions fail as constructors ❌
+4. **Constructor mocking**: Stricter validation of constructor implementations ❌
 
 ### Overall Risk Level
-🟡 **MODERATE** - One required breaking config change, expected coverage number changes, but codebase avoids deprecated patterns.
+🔴 **HIGH** - Requires refactoring all mock factories that use arrow functions. Estimated impact: 15-20+ files with 100+ tests need updates.
 
 ---
 
@@ -252,16 +282,66 @@ git checkout HEAD~1 -- packages/web/vitest.config.js
 
 ---
 
+---
+
+## Recommendation & Next Steps
+
+### Current Status (2025-10-23)
+- ✅ Vitest 4 upgrade attempted
+- ❌ 130 tests failing due to arrow function constructor mocking issues
+- ✅ Root cause identified: Stricter constructor mock validation in Vitest 4
+
+### For Future Vitest 4 Migration
+
+**Estimated Effort:** 8-12 hours of refactoring
+
+**Required Changes:**
+1. **Refactor all mock factories** (15-20+ files):
+   - Convert arrow functions to regular functions in `vi.mock()` factory definitions
+   - Update any dynamic mock returns that use arrow functions
+   - Test each file after refactoring
+
+2. **Update configuration** (simple, < 5 mins):
+   - Replace `poolOptions.forks.singleFork` with `maxWorkers: 1`
+   - Add `coverage.include` patterns
+
+3. **Comprehensive testing**:
+   - Run full test suite after each file batch
+   - Verify coverage reports
+   - Run typecheck
+
+**Files Known to Need Changes:**
+- `tests/unit/export-enhanced.test.js` (14+ failures)
+- `tests/setup.ts` (mock setup)
+- `tests/bridge/app-bridge.test.ts`
+- `tests/bridge/service-coordinator.test.ts`
+- `tests/services/auth-service.test.ts`
+- And others using arrow function mocks
+
+**Recommendation:**
+- ⏸️ **DEFER** Vitest 4 upgrade until:
+  - More time available for refactoring (not urgent)
+  - Desktop app work can be paused
+  - Can dedicate focused time to test migration
+- 🎯 **DO** keep this documentation for future reference
+- 📋 **TRACK** this as a "Tech Debt" item for future sprint
+
+### Alternative: Vitest 3.x Updates
+Consider staying on Vitest 3.2.4 for now and:
+- Apply minor/patch updates as they're released
+- Monitor Vitest 4 adoption in ecosystem
+- Revisit migration in 6-12 months when patterns stabilize
+
+---
+
 ## Progress Tracker
 
 - [x] Create feature branch
-- [ ] Capture baseline metrics
-- [ ] Update vitest.config.js
-- [ ] Upgrade packages
-- [ ] Run test suite
-- [ ] Run coverage
-- [ ] Run typecheck
-- [ ] Commit changes
-- [ ] Merge to staging
-- [ ] Deploy to beta
-- [ ] Create PR to main
+- [x] Capture baseline metrics (1225 tests passing)
+- [x] Update vitest.config.js (reverted)
+- [x] Upgrade packages (reverted after test failures)
+- [x] Run test suite (found 130 failures with v4)
+- [x] Identify root cause (arrow function constructor mocks)
+- [x] Document findings
+- [ ] Commit documentation
+- [ ] Return to main branch
