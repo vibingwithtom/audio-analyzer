@@ -69,21 +69,23 @@ transcriptionConfig?: {
 ## Testing Findings (Prototype)
 
 ### Performance ✅
-- **Whisper-base:** 300MB download (cached once)
-- **Speed:** 6-16x real-time depending on audio length
+- **Whisper-small:** 500MB download (cached once)
+- **Speed:** 2-5x real-time depending on audio length
 - **Chunking:** Handles audio >30 seconds properly (5s overlap)
 - **Acceptable for batch processing:** Yes
 
 ### Accuracy ✅
-- **String similarity:** 90.2% with natural speech variations
-- **Word accuracy:** 74.7% (secondary metric)
+- **English:** 90.2% with natural speech variations
+- **Spanish:** Works excellently
+- **Turkish:** Testing with small model (base model failed)
 - **90% threshold:** Appropriate for catching mismatches while allowing natural variations
 - **Multiple paragraph transcription:** Works correctly with chunking
 
 ### Quality Issues Found & Fixed
 - ❌ Whisper-tiny: Hallucination on some audio → Fixed with base model
+- ❌ Whisper-base: Turkish completely broken (even with language hints) → Testing small model
 - ❌ Long audio (>30s) truncation → Fixed with chunking
-- ✅ Both issues resolved in current prototype
+- ✅ Most issues resolved, Turkish still being tested
 
 ## Next Steps (Tomorrow)
 

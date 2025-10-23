@@ -93,22 +93,23 @@ Example JSON output:
 
 ## First Run
 
-The first time you run this, it will download the Whisper multilingual model (~300MB). This may take 5-10 minutes depending on your internet speed.
+The first time you run this, it will download the Whisper multilingual model (~500MB). This may take 10-15 minutes depending on your internet speed.
 
 Subsequent runs use the cached model and are much faster.
 
 ## Model Details
 
-- **Model**: Whisper-base (Multilingual)
-- **Languages**: Supports 97+ languages including English, Spanish, French, German, etc.
-- **Size**: ~300MB (quantized)
-- **Speed**: ~5-10x faster than real-time on modern hardware
-- **Accuracy**: Excellent accuracy across all languages with minimal hallucination
+- **Model**: Whisper-small (Multilingual)
+- **Languages**: Supports 97+ languages including English, Spanish, Turkish, French, German, etc.
+- **Size**: ~500MB (quantized)
+- **Speed**: ~2-5x faster than real-time on modern hardware
+- **Accuracy**: High accuracy across all languages including challenging languages like Turkish
 
 ## Notes
 
-- This uses the quantized (smaller, faster) version of Whisper-base
-- Trade-off: Larger than tiny (~300MB vs ~140MB) but much more accurate and fewer hallucinations
+- This uses the quantized (smaller, faster) version of Whisper-small
+- Trade-off: Larger than base (~500MB vs ~300MB) but better accuracy especially for non-English languages
+- Better language support than smaller models, especially for Turkish and other challenging languages
 - Audio duration estimates are approximate (based on file size)
 - Requires Node.js 16+
 - Works with: WAV, MP3, M4A, OGG, FLAC, etc.
