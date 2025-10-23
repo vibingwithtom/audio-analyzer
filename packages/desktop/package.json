@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@audio-analyzer/core": "^1.0.0",
-    "dotenv": "^16.0.0",
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.1.0"
+    "dotenv": "^17.2.3",
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
-    "electron": "^26.0.0",
-    "electron-builder": "^24.6.0",
-    "rimraf": "^5.0.0"
+    "electron": "^38.4.0",
+    "electron-builder": "^26.0.12",
+    "rimraf": "^6.0.1"
   },
   "build": {
     "appId": "com.vibingwithtom.audio-analyzer",
@@ -41,15 +41,25 @@
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.music",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
       "icon": "assets/icon.ico",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
       "icon": "assets/icon.png",
-      "target": ["AppImage", "deb", "rpm"]
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
     },
     "publish": {
       "provider": "github",
@@ -57,7 +67,12 @@
       "repo": "audio-analyzer-extension"
     }
   },
-  "keywords": ["electron", "audio", "analyzer", "desktop"],
+  "keywords": [
+    "electron",
+    "audio",
+    "analyzer",
+    "desktop"
+  ],
   "author": "vibingwithtom",
   "license": "MIT"
 }
