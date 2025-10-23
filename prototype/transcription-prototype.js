@@ -150,7 +150,8 @@ async function transcribeAudio(audioPath, scriptPath, language = null) {
     // Add language if specified (e.g., "tr" for Turkish, "es" for Spanish)
     if (language) {
       transcribeOptions.language = language;
-      console.log(`   Using language hint: ${language}`);
+      transcribeOptions.task = 'transcribe';
+      console.log(`   Using language hint: ${language} with task: transcribe`);
     }
 
     console.log(`   Transcription options:`, JSON.stringify(transcribeOptions, null, 2));
