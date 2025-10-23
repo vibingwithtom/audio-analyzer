@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisper Transcription Prototype</title>
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0/dist/transformers.min.js"></script>
+    <script src="https://unpkg.com/@xenova/transformers@2.6.0"></script>
     <style>
         * {
             margin: 0;
@@ -451,8 +451,19 @@
 
         // Initialize model on page load
         window.addEventListener('load', async () => {
-            // Give the script a moment to fully load
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for library to load with timeout
+            let attempts = 0;
+            while (!window.transformers && attempts < 20) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                attempts++;
+            }
+
+            if (!window.transformers) {
+                document.getElementById('modelStatus').innerHTML =
+                    '<span style="color: #c62828;"><strong>✗ Error:</strong> Failed to load Transformers.js library from CDN. Please check your internet connection and refresh the page.</span>';
+                return;
+            }
+
             model = await initializeModel();
         });
 
