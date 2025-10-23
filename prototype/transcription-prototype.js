@@ -153,10 +153,13 @@ async function transcribeAudio(audioPath, scriptPath, language = null) {
     }
 
     console.log(`   Transcription options:`, JSON.stringify(transcribeOptions, null, 2));
+    console.log(`   Starting transcription... (this may take several minutes for long audio)`);
 
     const result = await recognizer(audioData, transcribeOptions);
     const endTime = performance.now();
     const processingTime = (endTime - startTime) / 1000;
+
+    console.log(`   ✓ Transcription complete`);
 
     // Log detected language from result
     console.log(`   Result object keys:`, Object.keys(result));
