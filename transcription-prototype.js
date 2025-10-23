@@ -77,25 +77,32 @@ function calculateWordAccuracy(transcribed, reference) {
 async function decodeAudio(audioPath) {
   return new Promise((resolve, reject) => {
     const tempFile = `/tmp/audio_decoded_${Date.now()}.raw`;
+    console.log(`   Decoding to: ${tempFile}`);
 
     ffmpeg(audioPath)
       .audioFrequency(16000) // Whisper expects 16kHz
       .audioChannels(1) // Mono
       .audioCodec('pcm_f32le') // Float32 little-endian
       .format('f32le')
-      .pipe(fs.createWriteStream(tempFile))
+      .on('start', (cmd) => {
+        console.log(`   FFmpeg command: ${cmd}`);
+      })
+      .pipe(fs.createWriteStream(tempFile), { end: true })
       .on('end', () => {
         try {
+          console.log(`   ✓ Audio decoded successfully`);
           const buffer = fs.readFileSync(tempFile);
           const float32Array = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+          console.log(`   ✓ Converted to Float32Array (${float32Array.length} samples)`);
           fs.unlinkSync(tempFile);
           resolve(float32Array);
         } catch (error) {
-          fs.unlinkSync(tempFile);
+          if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
           reject(error);
         }
       })
       .on('error', (err) => {
+        console.log(`   ✗ FFmpeg error: ${err.message}`);
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
         reject(new Error(`FFmpeg error: ${err.message}`));
       });
@@ -241,7 +248,12 @@ if (args.length === 0) {
 const audioFile = args[0];
 const scriptFile = args[1] || null;
 
-transcribeAudio(audioFile, scriptFile).catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+transcribeAudio(audioFile, scriptFile)
+  .then(() => {
+    console.log('Process completed successfully');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
