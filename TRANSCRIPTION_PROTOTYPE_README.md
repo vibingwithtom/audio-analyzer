@@ -93,16 +93,17 @@ Example JSON output:
 
 ## First Run
 
-The first time you run this, it will download the Whisper model (~200MB). This may take 1-2 minutes depending on your internet speed.
+The first time you run this, it will download the Whisper multilingual model (~140MB). This may take 2-3 minutes depending on your internet speed.
 
 Subsequent runs use the cached model and are much faster.
 
 ## Model Details
 
-- **Model**: Whisper-tiny (English)
-- **Size**: ~70MB (quantized)
+- **Model**: Whisper-tiny (Multilingual)
+- **Languages**: Supports 97+ languages including English, Spanish, French, German, etc.
+- **Size**: ~140MB (quantized)
 - **Speed**: ~2-4x faster than real-time on modern hardware
-- **Accuracy**: Good for most accents and audio qualities
+- **Accuracy**: Good for most accents and audio qualities across all supported languages
 
 ## Notes
 

@@ -90,10 +90,10 @@ async function transcribeAudio(audioPath, scriptPath) {
   }
 
   // Initialize model
-  console.log('\n⏳ Loading Whisper model (this may take 1-2 minutes on first run)...\n');
+  console.log('\n⏳ Loading Whisper model (multilingual, may take 2-3 minutes on first run)...\n');
   let recognizer;
   try {
-    recognizer = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
+    recognizer = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
       quantized: true,
     });
   } catch (error) {
