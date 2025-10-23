@@ -154,6 +154,7 @@ async function transcribeAudio(audioPath, scriptPath, language = null) {
 
     console.log(`   Transcription options:`, JSON.stringify(transcribeOptions, null, 2));
     console.log(`   Starting transcription... (this may take several minutes for long audio)`);
+    console.log(`   Note: If language is still not recognized, transformers.js may have a bug or require different format`);
 
     const result = await recognizer(audioData, transcribeOptions);
     const endTime = performance.now();
@@ -161,13 +162,30 @@ async function transcribeAudio(audioPath, scriptPath, language = null) {
 
     console.log(`   ✓ Transcription complete`);
 
-    // Log detected language from result
-    console.log(`   Result object keys:`, Object.keys(result));
+    // Inspect full result object to find language info
+    console.log(`\n   === Result Object Inspection ===`);
+    console.log(`   Full result:`, JSON.stringify(result, null, 2));
+    console.log(`   Result type:`, typeof result);
+    console.log(`   Result keys:`, Object.keys(result));
+
+    // Check for language info in various places
     if (result.language) {
-      console.log(`   ✓ Detected language: ${result.language}`);
-    } else {
-      console.log(`   ⚠ No language info in result`);
+      console.log(`   ✓ Found language in result.language: ${result.language}`);
     }
+    if (result.detected_language) {
+      console.log(`   ✓ Found language in result.detected_language: ${result.detected_language}`);
+    }
+    if (result.language_code) {
+      console.log(`   ✓ Found language in result.language_code: ${result.language_code}`);
+    }
+    if (result.detected_language_code) {
+      console.log(`   ✓ Found language in result.detected_language_code: ${result.detected_language_code}`);
+    }
+
+    if (!result.language && !result.detected_language && !result.language_code && !result.detected_language_code) {
+      console.log(`   ⚠ No language detection info available in result object`);
+    }
+    console.log(`   === End Inspection ===\n`);
 
     const transcribedText = result.text;
     const fileSize = fs.statSync(audioPath).size;
