@@ -114,6 +114,10 @@
   let batchFolderUrl = $state(''); // URL of folder being processed
   let currentDisplayedFile = $state<string | null>(null); // Track which file is currently shown in progress bar
 
+  // Track previous state for auto-cancel logic
+  let previousAnalysisMode = $state<AnalysisMode | null>(null);
+  let previousTab = $state<string | null>(null);
+
   // Cleanup blob URL when component is destroyed
   function cleanup() {
     if (currentAudioUrl) {
@@ -133,6 +137,32 @@
       // Always mark as stale if mode changed - require full reprocessing for proper status updates
       resultsStale = $analysisMode !== resultsMode;
     }
+  });
+
+  // Auto-cancel analysis when analysis mode changes during processing
+  $effect(() => {
+    const currentMode = $analysisMode;
+    if ((processing || batchProcessing) && previousAnalysisMode !== null && previousAnalysisMode !== currentMode) {
+      // Mode changed while processing - auto-cancel
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - analysis mode changed';
+      cancelCurrentAnalysis();
+      batchCancelled = true; // For batch loop
+    }
+    previousAnalysisMode = currentMode;
+  });
+
+  // Auto-cancel analysis when switching away from this tab
+  $effect(() => {
+    const currentTabValue = $currentTab;
+    if ((processing || batchProcessing) && previousTab !== null && previousTab === 'box' && currentTabValue !== 'box') {
+      // Switched away from Box tab while processing - auto-cancel
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - switched tabs';
+      cancelCurrentAnalysis();
+      batchCancelled = true; // For batch loop
+    }
+    previousTab = currentTabValue;
   });
 
   /**
@@ -170,6 +200,10 @@
     currentFile = file;
     analysisProgress.visible = false;
     analysisProgress.cancelling = false;
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
+    previousTab = $currentTab;
 
     try {
       // Validate file type against current preset criteria BEFORE analyzing
@@ -379,6 +413,10 @@
     error = '';
     resultsMode = $analysisMode;
     currentDisplayedFile = null; // Reset the currently displayed file
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
+    previousTab = $currentTab;
 
     // Show progress bar immediately
     analysisProgress.visible = true;
