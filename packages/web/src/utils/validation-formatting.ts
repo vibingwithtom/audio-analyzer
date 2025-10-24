@@ -118,8 +118,10 @@ export function splitValidationErrors(concatenated: string): string[] {
     errors = concatenated.split('\\n');
   }
 
-  // If still only one result, try splitting on case boundaries (for fully concatenated errors)
-  if (errors.length === 1) {
+  // Only try case boundary split if we still have one result AND
+  // the string looks like concatenated errors (multiple sentences with capital letters after punctuation)
+  // This prevents splitting single error messages that contain "[ConversationID]" etc
+  if (errors.length === 1 && /[.!?]\s*[A-Z]/.test(concatenated)) {
     errors = concatenated.split(/(?<=[a-z\)])(?=[A-Z])/);
   }
 
