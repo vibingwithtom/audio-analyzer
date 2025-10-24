@@ -337,21 +337,40 @@ describe('LevelAnalyzer - Mic/Headphone Bleed Detection', () => {
   });
 
   describe('Threshold Constants', () => {
-    it('should use consistent thresholds across analysis', () => {
+    it('should detect mic bleed when correlation is just above 0.3 threshold', () => {
       const buffer = createStereoBuffer({
         leftLevel: 0.5,
-        rightLevel: 0.05,
-        correlation: 0.35 // Just above 0.3 threshold
+        rightLevel: 0.2, // Poor separation (< 15 dB)
+        correlation: 0.31 // Just above 0.3 threshold -> mic bleed
       });
 
       analyzer.analysisInProgress = true;
       const result = analyzer.analyzeMicBleed(buffer);
       analyzer.analysisInProgress = false;
 
-      // With correlation = 0.35 (> 0.3), should detect mic bleed
+      // With correlation = 0.31 (> 0.3), should detect mic bleed
       if (result.new.confirmedBleedBlocks > 0) {
         expect(result.new.confirmedMicBleed).toBeGreaterThan(0);
+        expect(result.new.confirmedHeadphoneBleed).toBe(0);
       }
+    });
+
+    it('should detect headphone bleed when correlation is below 0.3 threshold', () => {
+      const buffer = createStereoBuffer({
+        duration: 2.0, // Longer for reliable detection
+        leftLevel: 0.5,
+        rightLevel: 0.2, // Poor separation (< 15 dB), audible level (> -70 dB)
+        correlation: 0.15 // Well below 0.3 threshold -> headphone bleed
+      });
+
+      analyzer.analysisInProgress = true;
+      const result = analyzer.analyzeMicBleed(buffer);
+      analyzer.analysisInProgress = false;
+
+      // With correlation = 0.15 (< 0.3) and audible level, should detect headphone bleed
+      expect(result.new.confirmedBleedBlocks).toBeGreaterThan(0);
+      expect(result.new.confirmedHeadphoneBleed).toBeGreaterThan(0);
+      expect(result.new.confirmedMicBleed).toBe(0);
     });
   });
 });
