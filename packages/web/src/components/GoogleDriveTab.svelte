@@ -172,7 +172,6 @@
 
       // Abort all in-flight downloads immediately
       if (batchAbortController) {
-        console.log(`[${new Date().toISOString()}] Aborting downloads due to tab switch to: ${$currentTab}`);
         batchAbortController.abort();
       }
 

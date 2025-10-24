@@ -197,7 +197,6 @@ class GoogleAuth {
   }
 
   async downloadFile(fileId, signal = null) {
-    console.log(`[${new Date().toISOString()}] Starting download for fileId: ${fileId}. Signal aborted: ${signal ? signal.aborted : 'no signal'}`);
     const token = await this.getValidToken();
 
     try {
@@ -246,9 +245,6 @@ class GoogleAuth {
       });
 
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log(`[${new Date().toISOString()}] Aborted download for fileId: ${fileId}`);
-      }
       throw new Error(`Google Drive download failed: ${error.message}`);
     }
   }
