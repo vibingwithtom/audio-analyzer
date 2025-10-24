@@ -144,10 +144,16 @@
     const currentMode = $analysisMode;
     if ((processing || batchProcessing) && previousAnalysisMode !== null && previousAnalysisMode !== currentMode) {
       // Mode changed while processing - auto-cancel
+      batchCancelled = true; // For batch loop
+
+      // Abort all in-flight downloads immediately
+      if (batchAbortController) {
+        batchAbortController.abort();
+      }
+
       analysisProgress.cancelling = true;
       analysisProgress.message = 'Cancelled - analysis mode changed';
       cancelCurrentAnalysis();
-      batchCancelled = true; // For batch loop
     }
     previousAnalysisMode = currentMode;
   });
@@ -163,6 +169,12 @@
       // Switched away from Google Drive tab while processing - auto-cancel
       // CRITICAL: Set cancellation flags immediately, before any async operations
       batchCancelled = true; // For batch loop - stops file queueing immediately
+
+      // Abort all in-flight downloads immediately
+      if (batchAbortController) {
+        batchAbortController.abort();
+      }
+
       analysisProgress.cancelling = true;
       analysisProgress.message = 'Cancelled - switched tabs';
       cancelCurrentAnalysis(); // Stop current audio analysis
@@ -304,6 +316,9 @@
     }
   }
 
+  // Keep reference to abort controller globally so effects can abort it
+  let batchAbortController: AbortController | null = null;
+
   /**
    * Process multiple files in batch with parallel processing
    * @param driveFiles - Array of Drive file metadata to process
@@ -321,6 +336,9 @@
     // Don't reset resultsStale - let reactive statement handle staleness detection
     resultsMode = $analysisMode;
     currentDisplayedFile = null; // Reset the currently displayed file
+
+    // Create abort controller for this batch
+    batchAbortController = new AbortController();
 
     // Initialize tracking for auto-cancel logic
     previousAnalysisMode = $analysisMode;
@@ -432,7 +450,8 @@
                 // Pass mode and filename for optimization (WAV files use partial download)
                 file = await driveAPI!.downloadFile(driveFile.id, {
                   mode: $analysisMode,
-                  filename: driveFile.name
+                  filename: driveFile.name,
+                  signal: batchAbortController?.signal
                 });
               }
 

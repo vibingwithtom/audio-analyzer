@@ -113,6 +113,7 @@ export class GoogleDriveAPI {
   async downloadFile(fileId: string, options?: {
     mode?: 'audio-only' | 'full' | 'filename-only' | 'experimental';
     filename?: string;
+    signal?: AbortSignal;
   }): Promise<File> {
     const mode = options?.mode || 'audio-only';
     const filename = options?.filename || '';
@@ -125,11 +126,11 @@ export class GoogleDriveAPI {
       // Full download needed for:
       // - Experimental mode (any format - needs full audio for analysis)
       // - Non-WAV files (MP3, FLAC, etc. - Web Audio API requires complete file)
-      return await this.googleAuth.downloadFile(fileId);
+      return await this.googleAuth.downloadFile(fileId, options?.signal);
     } else {
       // Partial download optimization for WAV files in audio-only/full mode
       // WAV headers contain all metadata, only need first ~100KB
-      const partialBlob = await this.googleAuth.downloadFileHeaders(fileId);
+      const partialBlob = await this.googleAuth.downloadFileHeaders(fileId, null, options?.signal);
       const metadata = await this.getFileMetadata(fileId);
       const file = new File([partialBlob], metadata.name, { type: metadata.mimeType });
 
