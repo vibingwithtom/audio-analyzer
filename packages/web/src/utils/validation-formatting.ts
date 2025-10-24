@@ -110,10 +110,15 @@ export function formatValidationMessage(
  * → ["Sample Rate: 44100 Hz (expected 48000 Hz)", "Channels: 2 (expected 1)"]
  */
 export function splitValidationErrors(concatenated: string): string[] {
-  // First try splitting on newlines (primary method)
+  // First try splitting on actual newlines
   let errors = concatenated.split('\n');
 
-  // If only one result, try splitting on case boundaries (for concatenated errors)
+  // If only one result, try splitting on escaped newlines (\\n as literal string)
+  if (errors.length === 1) {
+    errors = concatenated.split('\\n');
+  }
+
+  // If still only one result, try splitting on case boundaries (for fully concatenated errors)
   if (errors.length === 1) {
     errors = concatenated.split(/(?<=[a-z\)])(?=[A-Z])/);
   }
