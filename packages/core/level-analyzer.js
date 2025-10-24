@@ -1481,7 +1481,20 @@ export class LevelAnalyzer {
     const confirmedMicBleed = []; // High correlation = same-room mic bleed
     const confirmedHeadphoneBleed = []; // Low correlation but audible = headphone bleed
 
-    for (const block of concerningBlocks) {
+    // Performance optimization: For files with many concerning blocks (e.g., sustained bleed),
+    // limit cross-correlation analysis to the worst blocks to avoid O(n²) performance issues.
+    // This doesn't sacrifice accuracy since we're analyzing the most problematic segments.
+    const maxBlocksToAnalyze = 100; // Analyze up to 100 worst blocks
+    let blocksToAnalyze = concerningBlocks;
+
+    if (concerningBlocks.length > maxBlocksToAnalyze) {
+      // Sort by separation (worst first) and take top N
+      blocksToAnalyze = [...concerningBlocks]
+        .sort((a, b) => a.separation - b.separation)
+        .slice(0, maxBlocksToAnalyze);
+    }
+
+    for (const block of blocksToAnalyze) {
       const correlation = this.calculateCrossCorrelation(
         leftChannel,
         rightChannel,
