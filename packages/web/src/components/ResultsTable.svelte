@@ -430,6 +430,20 @@
 
     // EXPERIMENTAL METRICS (only if experimentalMode = true)
     if (experimentalMode) {
+      // Normalization
+      if (result.normalizationStatus) {
+        const normStatus = getNormalizationStatus(result.normalizationStatus);
+        if (normStatus === 'warning') {
+          const distance = Math.abs(
+            (result.normalizationStatus.peakDb || 0) - (result.normalizationStatus.targetDb || -6)
+          );
+          reasons.push({
+            reason: `Normalization: ${distance.toFixed(1)} dB ${result.normalizationStatus.status === 'too_loud' ? 'over' : 'under'} target`,
+            severity: 'warning'
+          });
+        }
+      }
+
       // Clipping
       if (result.clippingAnalysis) {
         const severity = getClippingStatus(result.clippingAnalysis);
@@ -437,7 +451,7 @@
           const { severity: sev } = getClippingSeverity(result.clippingAnalysis);
           const severityLevel = sev === 'error' ? 'error' : 'warning';
           reasons.push({
-            reason: `Clipping: ${result.clippingAnalysis.clippingEventCount} event${result.clippingAnalysis.clippingEventCount > 1 ? 's' : ''} (${result.clippingAnalysis.clippedPercentage.toFixed(1)}%)`,
+            reason: `Clipping: ${result.clippingAnalysis.clippedPercentage.toFixed(2)}%`,
             severity: severityLevel
           });
         }
@@ -492,27 +506,30 @@
       // Mic Bleed
       const micBleedClass = getUnifiedMicBleedClass(result.micBleed);
       if (micBleedClass === 'error' || micBleedClass === 'warning') {
-        const bleedLabel = getUnifiedMicBleedLabel(result.micBleed);
         const micBleedCount = result.micBleed?.new?.confirmedMicBleed || 0;
         const headphoneBleedCount = result.micBleed?.new?.confirmedHeadphoneBleed || 0;
 
-        if (micBleedCount > 0 || headphoneBleedCount > 0) {
-          if (micBleedCount > 0 && headphoneBleedCount > 0) {
-            reasons.push({
-              reason: `Mic Bleed: ${micBleedCount} mic + ${headphoneBleedCount} headphone block${Math.max(micBleedCount, headphoneBleedCount) > 1 ? 's' : ''}`,
-              severity: micBleedClass === 'error' ? 'error' : 'warning'
-            });
-          } else if (micBleedCount > 0) {
-            reasons.push({
-              reason: `Mic Bleed: ${micBleedCount} block${micBleedCount > 1 ? 's' : ''}`,
-              severity: micBleedClass === 'error' ? 'error' : 'warning'
-            });
-          } else {
-            reasons.push({
-              reason: `Headphone Bleed: ${headphoneBleedCount} block${headphoneBleedCount > 1 ? 's' : ''}`,
-              severity: micBleedClass === 'error' ? 'error' : 'warning'
-            });
-          }
+        if (micBleedCount > 0 && headphoneBleedCount > 0) {
+          reasons.push({
+            reason: `Mic Bleed: Detected (mic + headphone)`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else if (micBleedCount > 0) {
+          reasons.push({
+            reason: `Mic Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else if (headphoneBleedCount > 0) {
+          reasons.push({
+            reason: `Headphone Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else {
+          // Fallback if old method detected it
+          reasons.push({
+            reason: `Mic Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
         }
       }
 
