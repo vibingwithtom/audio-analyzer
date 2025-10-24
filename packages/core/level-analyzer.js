@@ -1488,9 +1488,19 @@ export class LevelAnalyzer {
     let blocksToAnalyze = concerningBlocks;
 
     if (concerningBlocks.length > maxBlocksToAnalyze) {
-      // Sort by separation (worst first) and take top N
+      // Sort by combined severity: prioritize both poor separation (mic bleed)
+      // and audible quiet channels (headphone bleed)
+      // Lower score = worse (smaller separation or louder bleed)
       blocksToAnalyze = [...concerningBlocks]
-        .sort((a, b) => a.separation - b.separation)
+        .sort((a, b) => {
+          // Calculate severity: separation minus audibility in dB
+          // This balances both metrics (e.g., 10 dB separation with -60 dB bleed = -50 severity)
+          const bleedDbA = a.bleedRms > 0 ? 20 * Math.log10(a.bleedRms) : -100;
+          const bleedDbB = b.bleedRms > 0 ? 20 * Math.log10(b.bleedRms) : -100;
+          const severityA = a.separation - bleedDbA;
+          const severityB = b.separation - bleedDbB;
+          return severityA - severityB; // Lowest severity (most problematic) first
+        })
         .slice(0, maxBlocksToAnalyze);
     }
 
