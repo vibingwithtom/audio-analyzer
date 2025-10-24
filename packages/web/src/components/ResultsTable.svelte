@@ -414,16 +414,35 @@
     // BASE VALIDATION (always applicable)
     if (result.validation) {
       Object.entries(result.validation).forEach(([field, validation]) => {
-        if (validation.issue) {
-          // Split concatenated error messages
-          const splitErrors = validation.issue.split(/(?<=[a-z\)])(?=[A-Z])/);
-          const severity = validation.status === 'fail' ? 'error' : 'warning';
-          splitErrors.forEach(err => {
-            const trimmed = err.trim();
-            if (trimmed.length > 0) {
-              reasons.push({ reason: trimmed, severity });
-            }
-          });
+        // Only show fail/warning statuses, not pass
+        if (validation.status === 'fail' || validation.status === 'warning') {
+          if (validation.issue) {
+            // Split concatenated error messages
+            const splitErrors = validation.issue.split(/(?<=[a-z\)])(?=[A-Z])/);
+            const severity = validation.status === 'fail' ? 'error' : 'warning';
+            splitErrors.forEach(err => {
+              const trimmed = err.trim();
+              if (trimmed.length > 0) {
+                reasons.push({ reason: trimmed, severity });
+              }
+            });
+          } else {
+            // If no issue message, generate a generic one based on field
+            const fieldNames: { [key: string]: string } = {
+              fileType: 'File Type',
+              sampleRate: 'Sample Rate',
+              bitDepth: 'Bit Depth',
+              channels: 'Channels',
+              duration: 'Duration',
+              filename: 'Filename'
+            };
+            const severity = validation.status === 'fail' ? 'error' : 'warning';
+            const displayName = fieldNames[field] || field;
+            reasons.push({
+              reason: `${displayName}: Invalid`,
+              severity
+            });
+          }
         }
       });
     }
