@@ -1708,17 +1708,19 @@
   </div>
   {:else}
     <!-- STANDARD MODE TABLE -->
-    <div class="table-toolbar">
-      <button
-        class="view-mode-button"
-        onclick={toggleViewMode}
-        aria-label="Toggle compact view"
-        title="Toggle compact view (shows only filename, status, and issues)"
-      >
-        {viewMode === 'compact' ? '⊞' : '☰'}
-      </button>
-    </div>
-    {#if viewMode === 'compact'}
+    {#if !metadataOnly}
+      <div class="table-toolbar">
+        <button
+          class="view-mode-button"
+          onclick={toggleViewMode}
+          aria-label="Toggle compact view"
+          title="Toggle compact view (shows only filename, status, and issues)"
+        >
+          {viewMode === 'compact' ? '⊞' : '☰'}
+        </button>
+      </div>
+    {/if}
+    {#if viewMode === 'compact' && !metadataOnly}
       <!-- COMPACT VIEW FOR STANDARD MODE -->
       <table class="compact-table">
         <thead>
@@ -1751,7 +1753,7 @@
           {/each}
         </tbody>
       </table>
-    {:else}
+    {:else if metadataOnly || viewMode === 'full'}
       <!-- FULL VIEW FOR STANDARD MODE -->
       <table class="results-table">
     <thead>
