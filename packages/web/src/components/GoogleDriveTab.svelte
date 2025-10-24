@@ -361,6 +361,9 @@
             break;
           }
 
+          // Yield to event loop to allow cancellation effects to propagate
+          await Promise.resolve();
+
           const driveFile = driveFiles[index];
           const taskId = index;
           index++;

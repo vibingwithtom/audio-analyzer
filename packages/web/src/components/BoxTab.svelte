@@ -456,6 +456,9 @@
             break;
           }
 
+          // Yield to event loop to allow cancellation effects to propagate
+          await Promise.resolve();
+
           const boxFile = boxFiles[index];
           const taskId = index;
           index++;
