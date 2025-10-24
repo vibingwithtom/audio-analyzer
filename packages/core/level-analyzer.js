@@ -1395,7 +1395,8 @@ export class LevelAnalyzer {
         continue; // Skip silent blocks
       }
 
-      const ratio = rmsLeft / rmsRight;
+      // Safely calculate ratio, avoiding division by zero
+      const ratio = rmsRight > 0 ? rmsLeft / rmsRight : Infinity;
 
       if (ratio > dominanceRatioThreshold) {
         // Left channel is dominant, measure bleed in the right channel
@@ -1540,8 +1541,11 @@ export class LevelAnalyzer {
         const block = sortedBlocks[i];
         const prevBlock = sortedBlocks[i - 1];
 
-        // If blocks are close together (within segmentMergeWindow) and same type, merge into same segment
-        // This allows merging even if some blocks in between don't meet the threshold
+        // Merge blocks if:
+        // 1. Gap between blocks is < segmentMergeWindow (2.0s)
+        // 2. Both blocks are the same type (mic vs headphone)
+        // Note: This merges blocks even if there's clean audio between them, treating
+        // brief gaps as part of the same bleed event (e.g., 0.5s bleed + 1s gap + 0.5s bleed = 2s segment)
         if (block.timestamp - prevBlock.endSample / sampleRate < segmentMergeWindow && block.type === currentSegment.type) {
           currentSegment.endTime = block.endSample / sampleRate;
           currentSegment.maxCorrelation = Math.max(currentSegment.maxCorrelation, block.correlation);
