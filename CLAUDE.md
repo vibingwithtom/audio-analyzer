@@ -248,3 +248,4 @@ Use conventional commits format:
 - Tests must pass before production deployment (enforced by CI/CD)
 - Core library changes affect all platforms (web, extension, desktop)
 - Import paths use `@audio-analyzer/core` alias that resolves to `packages/core`
+- Always create a shortned url when creating a Svelte playground.
