@@ -126,11 +126,11 @@ export class GoogleDriveAPI {
       // Full download needed for:
       // - Experimental mode (any format - needs full audio for analysis)
       // - Non-WAV files (MP3, FLAC, etc. - Web Audio API requires complete file)
-      return await this.googleAuth.downloadFile(fileId, options?.signal || null);
+      return await this.googleAuth.downloadFile(fileId, (options?.signal ?? null) as any);
     } else {
       // Partial download optimization for WAV files in audio-only/full mode
       // WAV headers contain all metadata, only need first ~100KB
-      const partialBlob = await this.googleAuth.downloadFileHeaders(fileId, null, options?.signal || null);
+      const partialBlob = await this.googleAuth.downloadFileHeaders(fileId, null, (options?.signal ?? null) as any);
       const metadata = await this.getFileMetadata(fileId);
       const file = new File([partialBlob], metadata.name, { type: metadata.mimeType });
 

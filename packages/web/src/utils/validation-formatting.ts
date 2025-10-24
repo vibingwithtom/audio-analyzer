@@ -29,7 +29,7 @@ export function formatValidationMessage(
   validation: Partial<ValidationResult>,
   severity: 'fail' | 'warning'
 ): string {
-  const { target, actual } = validation;
+  const { target, actual } = validation as any;
 
   // Handle fields with standardized formatting
   switch (field) {
