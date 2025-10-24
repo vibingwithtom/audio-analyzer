@@ -56,7 +56,6 @@
 
   // Track previous state for auto-cancel logic
   let previousAnalysisMode = $state<AnalysisMode | null>(null);
-  let previousTab = $state<string | null>(null);
 
   // Cleanup blob URLs when component is destroyed
   function cleanup() {
@@ -108,15 +107,17 @@
 
   // Auto-cancel analysis when switching away from this tab
   $effect(() => {
-    const currentTabValue = $currentTab;
-    if (processing && previousTab !== null && previousTab === 'local' && currentTabValue !== 'local') {
+    // Explicitly depend on tab changes and processing state
+    $currentTab; // Add dependency tracking
+    processing;
+
+    if (processing && $currentTab !== 'local') {
       // Switched away from local tab while processing - auto-cancel
       analysisProgress.cancelling = true;
       analysisProgress.message = 'Cancelled - switched tabs';
       cancelCurrentAnalysis();
       cancelRequested = true; // For batch loop
     }
-    previousTab = currentTabValue;
   });
 
   async function processFile(file: File) {
@@ -133,7 +134,6 @@
 
     // Initialize tracking for auto-cancel logic
     previousAnalysisMode = $analysisMode;
-    previousTab = $currentTab;
 
     try {
       // Validate file type against current preset criteria BEFORE analyzing
@@ -258,7 +258,6 @@
 
     // Initialize tracking for auto-cancel logic
     previousAnalysisMode = $analysisMode;
-    previousTab = $currentTab;
 
     // Track batch start
     analyticsService.track('batch_processing_started', {
