@@ -1,6 +1,14 @@
 <script lang="ts">
   import StatusBadge from './StatusBadge.svelte';
   import { formatSampleRate, formatDuration, formatBitDepth, formatChannels, formatBytes } from '../utils/format-utils';
+  import {
+    formatValidationMessage,
+    splitValidationErrors,
+    formatSilenceTime,
+    formatDb,
+    formatPercent,
+    formatReverbTime
+  } from '../utils/validation-formatting';
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
@@ -416,46 +424,18 @@
       Object.entries(result.validation).forEach(([field, validation]) => {
         // Only show fail/warning statuses, not pass
         if (validation.status === 'fail' || validation.status === 'warning') {
+          const severity = validation.status === 'fail' ? 'error' : 'warning';
+
           if (validation.issue) {
-            // Split concatenated error messages
-            const splitErrors = validation.issue.split(/(?<=[a-z\)])(?=[A-Z])/);
-            const severity = validation.status === 'fail' ? 'error' : 'warning';
+            // Split concatenated error messages using shared utility
+            const splitErrors = splitValidationErrors(validation.issue);
             splitErrors.forEach(err => {
-              const trimmed = err.trim();
-              if (trimmed.length > 0) {
-                reasons.push({ reason: trimmed, severity });
-              }
+              reasons.push({ reason: err, severity });
             });
           } else {
-            // If no issue message, generate a specific one based on field
-            const severity = validation.status === 'fail' ? 'error' : 'warning';
-            let message = '';
-
-            // Create specific messages for known fields with available data
-            if (field === 'channels' && validation.target && validation.actual !== undefined) {
-              const expected = validation.target.join(' or ');
-              message = `Channels: ${validation.actual} (expected ${expected})`;
-            } else if (field === 'sampleRate' && validation.target && validation.actual !== undefined) {
-              const expected = validation.target.join(' or ');
-              message = `Sample Rate: ${validation.actual} Hz (expected ${expected})`;
-            } else if (field === 'bitDepth' && validation.target && validation.actual !== undefined) {
-              const expected = validation.target.join(' or ');
-              message = `Bit Depth: ${validation.actual}-bit (expected ${expected})`;
-            } else {
-              // Fallback for other fields
-              const fieldNames: { [key: string]: string } = {
-                fileType: 'File Type',
-                duration: 'Duration',
-                filename: 'Filename'
-              };
-              const displayName = fieldNames[field] || field;
-              message = `${displayName}: Invalid`;
-            }
-
-            reasons.push({
-              reason: message,
-              severity
-            });
+            // If no issue message, generate a specific formatted one using shared utility
+            const message = formatValidationMessage(field, validation, validation.status);
+            reasons.push({ reason: message, severity });
           }
         }
       });
@@ -484,7 +464,7 @@
           const { severity: sev } = getClippingSeverity(result.clippingAnalysis);
           const severityLevel = sev === 'error' ? 'error' : 'warning';
           reasons.push({
-            reason: `Clipping: ${result.clippingAnalysis.clippedPercentage.toFixed(2)}%`,
+            reason: `Clipping: ${formatPercent(result.clippingAnalysis.clippedPercentage)}`,
             severity: severityLevel
           });
         }
@@ -495,7 +475,7 @@
         const severity = getNoiseFloorStatus(result.noiseFloorDb);
         if (severity === 'error' || severity === 'warning') {
           reasons.push({
-            reason: `Noise Floor: ${result.noiseFloorDb === -Infinity ? '-∞' : result.noiseFloorDb.toFixed(1)} dB`,
+            reason: `Noise Floor: ${formatDb(result.noiseFloorDb)}`,
             severity: severity === 'error' ? 'error' : 'warning'
           });
         }
@@ -506,7 +486,7 @@
         const severity = getReverbClass(result.reverbInfo.label);
         if (severity === 'error' || severity === 'warning') {
           reasons.push({
-            reason: `Reverb: ${result.reverbInfo.label} (~${result.reverbInfo.time.toFixed(2)}s)`,
+            reason: `Reverb: ${formatReverbTime(result.reverbInfo.label, result.reverbInfo.time)}`,
             severity: severity === 'error' ? 'error' : 'warning'
           });
         }
@@ -519,19 +499,19 @@
 
       if (hasLeadingSilenceIssue) {
         reasons.push({
-          reason: `Leading Silence: ${formatTime(result.leadingSilence)}`,
+          reason: `Leading Silence: ${formatSilenceTime(result.leadingSilence)}`,
           severity: 'warning'
         });
       }
       if (hasTrailingSilenceIssue) {
         reasons.push({
-          reason: `Trailing Silence: ${formatTime(result.trailingSilence)}`,
+          reason: `Trailing Silence: ${formatSilenceTime(result.trailingSilence)}`,
           severity: 'warning'
         });
       }
       if (hasMaxSilenceIssue) {
         reasons.push({
-          reason: `Max Silence: ${formatTime(result.longestSilence)}`,
+          reason: `Max Silence: ${formatSilenceTime(result.longestSilence)}`,
           severity: 'warning'
         });
       }
@@ -571,7 +551,7 @@
         const overlapClass = getOverlapClass(result);
         if (overlapClass === 'error' || overlapClass === 'warning') {
           reasons.push({
-            reason: `Speech Overlap: ${result.conversationalAnalysis.overlap.overlapPercentage.toFixed(1)}%`,
+            reason: `Speech Overlap: ${formatPercent(result.conversationalAnalysis.overlap.overlapPercentage)}`,
             severity: overlapClass === 'error' ? 'error' : 'warning'
           });
         }
