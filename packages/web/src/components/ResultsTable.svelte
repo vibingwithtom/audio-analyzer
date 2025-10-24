@@ -217,13 +217,12 @@
     if (!result.validation) return [];
     const issues: string[] = [];
 
-    // Collect all validation issues
+    // Collect all validation issues using shared formatting utility
     Object.entries(result.validation).forEach(([field, validation]) => {
       if (validation.issue) {
-        // Split concatenated error messages
-        // Pattern: Capital letter after lowercase letter or closing paren indicates new error
-        const splitErrors = validation.issue.split(/(?<=[a-z\)])(?=[A-Z])/);
-        issues.push(...splitErrors.map(err => err.trim()).filter(err => err.length > 0));
+        // Use shared splitValidationErrors utility (splits on newlines first, then case boundaries)
+        const splitErrors = splitValidationErrors(validation.issue);
+        issues.push(...splitErrors);
       }
     });
 
