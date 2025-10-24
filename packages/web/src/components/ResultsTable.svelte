@@ -545,15 +545,17 @@
       }
 
       // Stereo Type (preset-aware)
-      if ($selectedPreset && result.stereoSeparation) {
+      if ($selectedPreset) {
         const validation = CriteriaValidator.validateStereoType(
           result.stereoSeparation,
           $selectedPreset
         );
         if (validation && validation.status !== 'pass') {
+          const detected = result.stereoSeparation?.stereoType || 'Not a stereo file';
+          const expected = $selectedPreset.stereoType?.join(' or ') || 'specific type';
           reasons.push({
-            reason: `Stereo Type: ${result.stereoSeparation.stereoType} (expected ${$selectedPreset.stereoType})`,
-            severity: validation.status === 'fail' ? 'error' : 'warning'
+            reason: `Stereo Type: ${detected} (expected ${expected})`,
+            severity: 'error' // Stereo type validation is binary: pass/fail
           });
         }
       }
