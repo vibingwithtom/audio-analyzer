@@ -451,6 +451,11 @@
 
         // Start new downloads up to concurrency limit
         while (inProgress.size < concurrency && index < boxFiles.length) {
+          // Check if cancelled before queueing new downloads
+          if (batchCancelled) {
+            break;
+          }
+
           const boxFile = boxFiles[index];
           const taskId = index;
           index++;

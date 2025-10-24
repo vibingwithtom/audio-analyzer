@@ -356,6 +356,11 @@
 
         // Start new downloads up to concurrency limit
         while (inProgress.size < concurrency && index < driveFiles.length) {
+          // Check if cancelled before queueing new downloads
+          if (batchCancelled) {
+            break;
+          }
+
           const driveFile = driveFiles[index];
           const taskId = index;
           index++;
