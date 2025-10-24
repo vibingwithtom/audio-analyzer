@@ -427,19 +427,33 @@
               }
             });
           } else {
-            // If no issue message, generate a generic one based on field
-            const fieldNames: { [key: string]: string } = {
-              fileType: 'File Type',
-              sampleRate: 'Sample Rate',
-              bitDepth: 'Bit Depth',
-              channels: 'Channels',
-              duration: 'Duration',
-              filename: 'Filename'
-            };
+            // If no issue message, generate a specific one based on field
             const severity = validation.status === 'fail' ? 'error' : 'warning';
-            const displayName = fieldNames[field] || field;
+            let message = '';
+
+            // Create specific messages for known fields with available data
+            if (field === 'channels' && validation.target && validation.actual !== undefined) {
+              const expected = validation.target.join(' or ');
+              message = `Channels: ${validation.actual} (expected ${expected})`;
+            } else if (field === 'sampleRate' && validation.target && validation.actual !== undefined) {
+              const expected = validation.target.join(' or ');
+              message = `Sample Rate: ${validation.actual} Hz (expected ${expected})`;
+            } else if (field === 'bitDepth' && validation.target && validation.actual !== undefined) {
+              const expected = validation.target.join(' or ');
+              message = `Bit Depth: ${validation.actual}-bit (expected ${expected})`;
+            } else {
+              // Fallback for other fields
+              const fieldNames: { [key: string]: string } = {
+                fileType: 'File Type',
+                duration: 'Duration',
+                filename: 'Filename'
+              };
+              const displayName = fieldNames[field] || field;
+              message = `${displayName}: Invalid`;
+            }
+
             reasons.push({
-              reason: `${displayName}: Invalid`,
+              reason: message,
               severity
             });
           }
