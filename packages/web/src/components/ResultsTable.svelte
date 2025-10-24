@@ -693,6 +693,25 @@
     margin-bottom: 0;
   }
 
+  .validation-errors {
+    list-style: disc;
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .validation-errors li {
+    margin: 0.25rem 0;
+    line-height: 1.4;
+  }
+
+  .validation-errors li:first-child {
+    margin-top: 0;
+  }
+
+  .validation-errors li:last-child {
+    margin-bottom: 0;
+  }
+
   /* Experimental mode value color-coding */
   .value-success {
     color: var(--success, #4CAF50);
@@ -1770,7 +1789,15 @@
           {#if metadataOnly}
             <!-- Filename-only mode: Show error details inline -->
             <td class="error-details-cell">
-              {getValidationIssue(result, 'filename') || '—'}
+              {#if getValidationIssue(result, 'filename')}
+                <ul class="validation-errors">
+                  {#each splitValidationErrors(getValidationIssue(result, 'filename') || '') as error}
+                    <li>{error}</li>
+                  {/each}
+                </ul>
+              {:else}
+                —
+              {/if}
             </td>
           {:else}
             <!-- Full analysis mode: Show all columns -->
