@@ -19,8 +19,9 @@ export function getNormalizationStatus(status: any | undefined): 'success' | 'wa
  */
 export function getReverbStatus(label: string | undefined): 'success' | 'warning' | 'error' | '' {
   if (!label) return '';
-  if (label.includes('Excellent') || label.includes('Good')) return 'success';
-  if (label.includes('Fair')) return 'warning';
+  if (label.includes('Very Poor')) return 'error';
+  if (label.includes('Excellent') || label.includes('Good') || label.includes('Fair')) return 'success';
+  if (label.includes('Poor')) return 'warning';
   return 'error';
 }
 

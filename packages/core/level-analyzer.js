@@ -1361,6 +1361,9 @@ export class LevelAnalyzer {
     const dominanceRatioThreshold = 1.5; // How much louder one channel must be to be "dominant"
     const silenceThreshold = 0.001; // RMS threshold for silence
     const separationThreshold = 15; // dB separation threshold for concern
+    const correlationThreshold = 0.3; // Threshold for detecting mic bleed via correlation
+    const audibleThreshold = -70; // dB threshold for detecting audible headphone bleed
+    const segmentMergeWindow = 2.0; // Seconds - merge segments within this time gap
 
     // OLD METHOD: Track bleed levels for averaging
     const leftBleedLevels = [];
@@ -1392,11 +1395,12 @@ export class LevelAnalyzer {
         continue; // Skip silent blocks
       }
 
-      const ratio = rmsLeft / rmsRight;
+      // Safely calculate ratio, avoiding division by zero
+      const ratio = rmsRight > 0 ? rmsLeft / rmsRight : Infinity;
 
       if (ratio > dominanceRatioThreshold) {
         // Left channel is dominant, measure bleed in the right channel
-        const dominantDb = 20 * Math.log10(rmsLeft);
+        const dominantDb = rmsLeft > 0 ? 20 * Math.log10(rmsLeft) : -Infinity;
         const bleedDb = rmsRight > 0 ? 20 * Math.log10(rmsRight) : -Infinity;
         const separation = dominantDb - bleedDb;
 
@@ -1418,7 +1422,7 @@ export class LevelAnalyzer {
         }
       } else if (ratio < 1 / dominanceRatioThreshold) {
         // Right channel is dominant, measure bleed in the left channel
-        const dominantDb = 20 * Math.log10(rmsRight);
+        const dominantDb = rmsRight > 0 ? 20 * Math.log10(rmsRight) : -Infinity;
         const bleedDb = rmsLeft > 0 ? 20 * Math.log10(rmsLeft) : -Infinity;
         const separation = dominantDb - bleedDb;
 
@@ -1474,10 +1478,33 @@ export class LevelAnalyzer {
     }
 
     // NEW METHOD: Cross-correlation for concerning blocks
-    const confirmedBleedBlocks = [];
-    const correlationThreshold = 0.3; // Lower threshold for speech correlation
+    const confirmedMicBleed = []; // High correlation = same-room mic bleed
+    const confirmedHeadphoneBleed = []; // Low correlation but audible = headphone bleed
 
-    for (const block of concerningBlocks) {
+    // Performance optimization: For files with many concerning blocks (e.g., sustained bleed),
+    // limit cross-correlation analysis to the worst blocks to avoid O(n²) performance issues.
+    // This doesn't sacrifice accuracy since we're analyzing the most problematic segments.
+    const maxBlocksToAnalyze = 100; // Analyze up to 100 worst blocks
+    let blocksToAnalyze = concerningBlocks;
+
+    if (concerningBlocks.length > maxBlocksToAnalyze) {
+      // Sort by combined severity: prioritize both poor separation (mic bleed)
+      // and audible quiet channels (headphone bleed)
+      // Lower score = worse (smaller separation or louder bleed)
+      blocksToAnalyze = [...concerningBlocks]
+        .sort((a, b) => {
+          // Calculate severity: separation minus audibility in dB
+          // This balances both metrics (e.g., 10 dB separation with -60 dB bleed = -50 severity)
+          const bleedDbA = a.bleedRms > 0 ? 20 * Math.log10(a.bleedRms) : -100;
+          const bleedDbB = b.bleedRms > 0 ? 20 * Math.log10(b.bleedRms) : -100;
+          const severityA = a.separation - bleedDbA;
+          const severityB = b.separation - bleedDbB;
+          return severityA - severityB; // Lowest severity (most problematic) first
+        })
+        .slice(0, maxBlocksToAnalyze);
+    }
+
+    for (const block of blocksToAnalyze) {
       const correlation = this.calculateCrossCorrelation(
         leftChannel,
         rightChannel,
@@ -1487,61 +1514,108 @@ export class LevelAnalyzer {
       );
 
       if (correlation > correlationThreshold) {
-        confirmedBleedBlocks.push({
+        // High correlation = mic bleed (same acoustic source)
+        confirmedMicBleed.push({
           ...block,
           correlation: correlation,
-          timestamp: block.startSample / sampleRate
+          timestamp: block.startSample / sampleRate,
+          type: 'mic'
         });
+      } else {
+        // Low correlation - check if it's audible anyway (headphone bleed)
+        const quietChannelDb = block.bleedRms > 0 ? 20 * Math.log10(block.bleedRms) : -Infinity;
+        if (quietChannelDb > audibleThreshold) {
+          confirmedHeadphoneBleed.push({
+            ...block,
+            correlation: correlation,
+            timestamp: block.startSample / sampleRate,
+            quietChannelDb: quietChannelDb,
+            type: 'headphone'
+          });
+        }
       }
     }
+
+    // Combine both types for backward compatibility
+    const confirmedBleedBlocks = [...confirmedMicBleed, ...confirmedHeadphoneBleed];
 
     const percentageConfirmedBleed = separationRatios.length > 0
       ? (confirmedBleedBlocks.length / separationRatios.length) * 100
       : 0;
 
-    // Group consecutive blocks into segments for cleaner display
-    const bleedSegments = [];
-    if (confirmedBleedBlocks.length > 0) {
-      // Sort by timestamp
-      const sortedBlocks = [...confirmedBleedBlocks].sort((a, b) => a.timestamp - b.timestamp);
+    // Helper function to group blocks into segments
+    const createSegments = (blocks) => {
+      if (blocks.length === 0) return [];
+
+      const sortedBlocks = [...blocks].sort((a, b) => a.timestamp - b.timestamp);
+      const segments = [];
 
       let currentSegment = {
         startTime: sortedBlocks[0].timestamp,
         endTime: sortedBlocks[0].endSample / sampleRate,
         maxCorrelation: sortedBlocks[0].correlation,
         minSeparation: sortedBlocks[0].separation,
-        blockCount: 1
+        maxQuietChannelDb: sortedBlocks[0].quietChannelDb || -Infinity,
+        blockCount: 1,
+        type: sortedBlocks[0].type
       };
 
       for (let i = 1; i < sortedBlocks.length; i++) {
         const block = sortedBlocks[i];
         const prevBlock = sortedBlocks[i - 1];
 
-        // If blocks are consecutive (within 1 second), merge into same segment
-        if (block.timestamp - prevBlock.endSample / sampleRate < 1.0) {
+        // Merge blocks if:
+        // 1. Gap between blocks is < segmentMergeWindow (2.0s)
+        // 2. Both blocks are the same type (mic vs headphone)
+        // Note: This merges blocks even if there's clean audio between them, treating
+        // brief gaps as part of the same bleed event (e.g., 0.5s bleed + 1s gap + 0.5s bleed = 2s segment)
+        if (block.timestamp - prevBlock.endSample / sampleRate < segmentMergeWindow && block.type === currentSegment.type) {
           currentSegment.endTime = block.endSample / sampleRate;
           currentSegment.maxCorrelation = Math.max(currentSegment.maxCorrelation, block.correlation);
           currentSegment.minSeparation = Math.min(currentSegment.minSeparation, block.separation);
+          currentSegment.maxQuietChannelDb = Math.max(currentSegment.maxQuietChannelDb, block.quietChannelDb || -Infinity);
           currentSegment.blockCount++;
         } else {
           // Start a new segment
-          bleedSegments.push(currentSegment);
+          segments.push(currentSegment);
           currentSegment = {
             startTime: block.timestamp,
             endTime: block.endSample / sampleRate,
             maxCorrelation: block.correlation,
             minSeparation: block.separation,
-            blockCount: 1
+            maxQuietChannelDb: block.quietChannelDb || -Infinity,
+            blockCount: 1,
+            type: block.type
           };
         }
       }
 
       // Push the last segment
-      bleedSegments.push(currentSegment);
+      segments.push(currentSegment);
+      return segments;
+    };
 
-      // Sort by worst correlation first
-      bleedSegments.sort((a, b) => b.maxCorrelation - a.maxCorrelation);
-    }
+    // Create separate segments for each bleed type
+    const micBleedSegments = createSegments(confirmedMicBleed);
+    const headphoneBleedSegments = createSegments(confirmedHeadphoneBleed);
+
+    // Sort mic bleed by worst correlation (higher = worse)
+    micBleedSegments.sort((a, b) => b.maxCorrelation - a.maxCorrelation);
+
+    // Sort headphone bleed by duration (longer sustained bleed = worse)
+    headphoneBleedSegments.sort((a, b) => {
+      const durationA = a.endTime - a.startTime;
+      const durationB = b.endTime - b.startTime;
+      return durationB - durationA; // Longest first
+    });
+
+    // Get top 5 of each
+    const worstMicBleedSegments = micBleedSegments.slice(0, 5);
+    const worstHeadphoneBleedSegments = headphoneBleedSegments.slice(0, 5);
+
+    // Legacy: Combined segments for backward compatibility
+    const bleedSegments = [...micBleedSegments, ...headphoneBleedSegments]
+      .sort((a, b) => a.startTime - b.startTime); // Sort by time for display
 
     // Calculate severity score (similar to Channel Consistency)
     // Normalize correlation (0.3-1.0 range) to 0-100 scale
@@ -1572,8 +1646,15 @@ export class LevelAnalyzer {
         concerningBlocks: concerningBlocks.length,
         confirmedBleedBlocks: confirmedBleedBlocks.length,
         worstBlocks: confirmedBleedBlocks.slice(0, 5), // Top 5 worst instances
-        // NEW: Segment-level details
-        bleedSegments: bleedSegments,
+        // NEW: Separate bleed types
+        confirmedMicBleed: confirmedMicBleed.length,
+        confirmedHeadphoneBleed: confirmedHeadphoneBleed.length,
+        micBleedBlocks: confirmedMicBleed,
+        headphoneBleedBlocks: confirmedHeadphoneBleed,
+        // NEW: Segment-level details (separated by type)
+        worstMicBleedSegments: worstMicBleedSegments, // Top 5 mic bleed, sorted by correlation
+        worstHeadphoneBleedSegments: worstHeadphoneBleedSegments, // Top 5 headphone bleed, sorted by loudness
+        bleedSegments: bleedSegments, // Legacy: all segments combined
         severityScore: severityScore,
         avgCorrelation: avgCorrelation,
         peakCorrelation: confirmedBleedBlocks.length > 0

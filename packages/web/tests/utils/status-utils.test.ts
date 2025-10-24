@@ -47,12 +47,16 @@ describe('status-utils', () => {
       expect(getReverbStatus('Good - Low Reverberation')).toBe('success');
     });
 
-    it('should return warning for fair reverb', () => {
-      expect(getReverbStatus('Fair - Moderate Reverberation')).toBe('warning');
+    it('should return success for fair reverb', () => {
+      expect(getReverbStatus('Fair - Moderate Reverberation')).toBe('success');
     });
 
-    it('should return error for poor reverb', () => {
-      expect(getReverbStatus('Poor - High Reverberation')).toBe('error');
+    it('should return warning for poor reverb', () => {
+      expect(getReverbStatus('Poor - High Reverberation')).toBe('warning');
+    });
+
+    it('should return error for very poor reverb', () => {
+      expect(getReverbStatus('Very Poor - Excessive Reverberation')).toBe('error');
     });
   });
 
@@ -296,7 +300,7 @@ describe('status-utils', () => {
       const result = createBaseResult();
       result.normalizationStatus = { status: 'normalized' };
       result.noiseFloorDb = -70;
-      result.reverbInfo = { label: 'Poor - High Reverberation' }; // error
+      result.reverbInfo = { label: 'Very Poor - Excessive Reverberation' }; // error
       expect(computeExperimentalStatus(result)).toBe('fail');
     });
 
@@ -312,7 +316,7 @@ describe('status-utils', () => {
       const result = createBaseResult();
       result.normalizationStatus = { status: 'normalized' }; // success
       result.noiseFloorDb = -55; // warning
-      result.reverbInfo = { label: 'Poor - High Reverberation' }; // error
+      result.reverbInfo = { label: 'Very Poor - Excessive Reverberation' }; // error
       expect(computeExperimentalStatus(result)).toBe('fail');
     });
 
