@@ -676,8 +676,11 @@
   }
 
   .error-details-cell {
-    white-space: pre-line;
     line-height: 1.6;
+    min-width: 300px;
+    max-width: 600px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .error-line {
@@ -702,6 +705,9 @@
   .validation-errors li {
     margin: 0.25rem 0;
     line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   .validation-errors li:first-child {

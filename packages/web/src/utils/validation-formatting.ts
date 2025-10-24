@@ -98,16 +98,27 @@ export function formatValidationMessage(
 }
 
 /**
- * Split concatenated validation error messages at case boundaries
- * Used for parsing multi-error validation.issue strings
+ * Split validation error messages on newlines or case boundaries
+ * Handles both newline-separated errors and concatenated errors
+ *
+ * @example
+ * splitValidationErrors("Filename must be all lowercase\nInvalid format: expected [ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]")
+ * → ["Filename must be all lowercase", "Invalid format: expected [ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]"]
  *
  * @example
  * splitValidationErrors("Sample Rate: 44100 Hz (expected 48000 Hz)Channels: 2 (expected 1)")
  * → ["Sample Rate: 44100 Hz (expected 48000 Hz)", "Channels: 2 (expected 1)"]
  */
 export function splitValidationErrors(concatenated: string): string[] {
-  return concatenated
-    .split(/(?<=[a-z\)])(?=[A-Z])/)
+  // First try splitting on newlines (primary method)
+  let errors = concatenated.split('\n');
+
+  // If only one result, try splitting on case boundaries (for concatenated errors)
+  if (errors.length === 1) {
+    errors = concatenated.split(/(?<=[a-z\)])(?=[A-Z])/);
+  }
+
+  return errors
     .map(err => err.trim())
     .filter(err => err.length > 0);
 }
