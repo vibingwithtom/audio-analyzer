@@ -268,16 +268,11 @@
       <!-- Tab Navigation -->
       <TabNavigation />
 
-      <!-- Tab Content -->
-      {#if $currentTab === 'local'}
-        <LocalFileTab />
-      {:else if $currentTab === 'googleDrive'}
-        <GoogleDriveTab />
-      {:else if $currentTab === 'box'}
-        <BoxTab />
-      {:else if $currentTab === 'settings'}
-        <SettingsTab />
-      {/if}
+      <!-- Tab Content - Keep all components mounted to preserve state and allow cancellation -->
+      <LocalFileTab hidden={$currentTab !== 'local'} />
+      <GoogleDriveTab hidden={$currentTab !== 'googleDrive'} />
+      <BoxTab hidden={$currentTab !== 'box'} />
+      <SettingsTab hidden={$currentTab !== 'settings'} />
     </div>
   </main>
 
