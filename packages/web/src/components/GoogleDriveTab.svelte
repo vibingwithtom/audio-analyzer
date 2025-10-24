@@ -414,6 +414,11 @@
                 return;
               }
 
+              // Check if cancelled before downloading
+              if (batchCancelled) {
+                return;
+              }
+
               // Check if filename-only mode - don't download the actual file
               let file: File;
               if ($analysisMode === 'filename-only') {
