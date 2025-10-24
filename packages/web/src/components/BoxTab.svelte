@@ -571,7 +571,15 @@
                 // No need to add to results, just stop this worker
                 return;
               }
-              // Log error for debugging
+
+              // Check if this is an abort error from cancellation
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              if (errorMessage.includes('aborted') || errorMessage.includes('abort')) {
+                // Silently ignore abort errors - they're expected when cancelling
+                return;
+              }
+
+              // Log actual errors for debugging
               console.error(`Error processing ${boxFile.name}:`, err);
 
               // Add error result
@@ -584,7 +592,7 @@
                 bitDepth: 0,
                 duration: 0,
                 status: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error'
+                error: errorMessage
               };
               batchResults = [...batchResults, errorResult];
               processedFiles = batchResults.length;

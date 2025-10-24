@@ -477,9 +477,17 @@
                 // No need to add to results, just stop this worker
                 return;
               }
-              // Log error for debugging with full details
+
+              // Check if this is an abort error from cancellation
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              if (errorMessage.includes('aborted') || errorMessage.includes('abort')) {
+                // Silently ignore abort errors - they're expected when cancelling
+                return;
+              }
+
+              // Log actual errors for debugging with full details
               console.error(`Error processing ${driveFile.name}:`);
-              console.error('Error message:', err instanceof Error ? err.message : String(err));
+              console.error('Error message:', errorMessage);
               console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
               console.error('Error object:', err);
 
@@ -493,7 +501,7 @@
                 bitDepth: 0,
                 duration: 0,
                 status: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error'
+                error: errorMessage
               };
               batchResults = [...batchResults, errorResult];
               processedFiles = batchResults.length;
