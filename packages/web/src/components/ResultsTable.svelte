@@ -1178,11 +1178,19 @@
 
                   if (oldDetected || newDetected) {
                     // Bleed detected - show detailed info
-                    let tooltip = 'Detects audio leakage between channels.\n\nResult: Mic bleed detected';
-                    if (result.micBleed.new?.bleedSegments?.length > 0) {
-                      tooltip += ` in ${result.micBleed.new.bleedSegments.length} segment${result.micBleed.new.bleedSegments.length > 1 ? 's' : ''}.`;
+                    let tooltip = 'Detects audio leakage between channels.\n\n';
+
+                    const micBleedCount = result.micBleed.new?.confirmedMicBleed || 0;
+                    const headphoneBleedCount = result.micBleed.new?.confirmedHeadphoneBleed || 0;
+
+                    if (micBleedCount > 0 && headphoneBleedCount > 0) {
+                      tooltip += `Result: Mic bleed (${micBleedCount} blocks) + Headphone bleed (${headphoneBleedCount} blocks)`;
+                    } else if (micBleedCount > 0) {
+                      tooltip += `Result: Mic bleed detected in ${micBleedCount} block${micBleedCount > 1 ? 's' : ''}`;
+                    } else if (headphoneBleedCount > 0) {
+                      tooltip += `Result: Headphone bleed detected in ${headphoneBleedCount} block${headphoneBleedCount > 1 ? 's' : ''}`;
                     } else {
-                      tooltip += '.';
+                      tooltip += 'Result: Bleed detected';
                     }
 
                     // Show NEW method details if available
@@ -1193,8 +1201,36 @@
                       tooltip += `\nPeak Correlation: ${result.micBleed.new.peakCorrelation.toFixed(2)}`;
                     }
 
-                    // Show worst affected segments (top 10) - only if NEW method has data
-                    if (result.micBleed.new?.bleedSegments?.length > 0) {
+                    // Show worst affected segments - separated by type
+                    const worstMic = result.micBleed.new?.worstMicBleedSegments || [];
+                    const worstHeadphone = result.micBleed.new?.worstHeadphoneBleedSegments || [];
+
+                    if (worstMic.length > 0) {
+                      tooltip += '\n\n⚠️ Worst mic bleed (same-room):';
+                      worstMic.forEach(seg => {
+                        const startMin = Math.floor(seg.startTime / 60);
+                        const startSec = Math.floor(seg.startTime % 60);
+                        const endMin = Math.floor(seg.endTime / 60);
+                        const endSec = Math.floor(seg.endTime % 60);
+                        const duration = seg.endTime - seg.startTime;
+                        tooltip += `\n${startMin}:${startSec.toString().padStart(2, '0')}-${endMin}:${endSec.toString().padStart(2, '0')} (${duration.toFixed(1)}s, ${seg.maxCorrelation.toFixed(2)} corr)`;
+                      });
+                    }
+
+                    if (worstHeadphone.length > 0) {
+                      tooltip += '\n\n⚠️ Worst headphone bleed (degraded):';
+                      worstHeadphone.forEach(seg => {
+                        const startMin = Math.floor(seg.startTime / 60);
+                        const startSec = Math.floor(seg.startTime % 60);
+                        const endMin = Math.floor(seg.endTime / 60);
+                        const endSec = Math.floor(seg.endTime % 60);
+                        const duration = seg.endTime - seg.startTime;
+                        tooltip += `\n${startMin}:${startSec.toString().padStart(2, '0')}-${endMin}:${endSec.toString().padStart(2, '0')} (${duration.toFixed(1)}s, ${seg.maxQuietChannelDb.toFixed(1)} dB)`;
+                      });
+                    }
+
+                    // Fallback to legacy bleedSegments if new separated ones don't exist
+                    if (worstMic.length === 0 && worstHeadphone.length === 0 && result.micBleed.new?.bleedSegments?.length > 0) {
                       tooltip += '\n\n⚠️ Worst affected times:';
                       const segmentsToShow = result.micBleed.new.bleedSegments.slice(0, 10);
                       segmentsToShow.forEach(seg => {
@@ -1202,14 +1238,8 @@
                         const startSec = Math.floor(seg.startTime % 60);
                         const endMin = Math.floor(seg.endTime / 60);
                         const endSec = Math.floor(seg.endTime % 60);
-
-                        // If segment duration < 1 second, show just start time
                         const duration = seg.endTime - seg.startTime;
-                        if (duration < 1.0) {
-                          tooltip += `\n${startMin}:${startSec.toString().padStart(2, '0')} (${seg.maxCorrelation.toFixed(2)} corr)`;
-                        } else {
-                          tooltip += `\n${startMin}:${startSec.toString().padStart(2, '0')}-${endMin}:${endSec.toString().padStart(2, '0')} (${seg.maxCorrelation.toFixed(2)} corr)`;
-                        }
+                        tooltip += `\n${startMin}:${startSec.toString().padStart(2, '0')}-${endMin}:${endSec.toString().padStart(2, '0')} (${duration.toFixed(1)}s, ${seg.maxCorrelation.toFixed(2)} corr)`;
                       });
                     } else if (oldDetected && result.micBleed.old) {
                       // If NEW method didn't find segments, show OLD method channel levels

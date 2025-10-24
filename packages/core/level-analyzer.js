@@ -1539,8 +1539,9 @@ export class LevelAnalyzer {
         const block = sortedBlocks[i];
         const prevBlock = sortedBlocks[i - 1];
 
-        // If blocks are consecutive (within 1 second) and same type, merge into same segment
-        if (block.timestamp - prevBlock.endSample / sampleRate < 1.0 && block.type === currentSegment.type) {
+        // If blocks are close together (within 2 seconds) and same type, merge into same segment
+        // This allows merging even if some blocks in between don't meet the threshold
+        if (block.timestamp - prevBlock.endSample / sampleRate < 2.0 && block.type === currentSegment.type) {
           currentSegment.endTime = block.endSample / sampleRate;
           currentSegment.maxCorrelation = Math.max(currentSegment.maxCorrelation, block.correlation);
           currentSegment.minSeparation = Math.min(currentSegment.minSeparation, block.separation);
@@ -1573,8 +1574,12 @@ export class LevelAnalyzer {
     // Sort mic bleed by worst correlation (higher = worse)
     micBleedSegments.sort((a, b) => b.maxCorrelation - a.maxCorrelation);
 
-    // Sort headphone bleed by loudness (higher dB = worse, closer to 0)
-    headphoneBleedSegments.sort((a, b) => b.maxQuietChannelDb - a.maxQuietChannelDb);
+    // Sort headphone bleed by duration (longer sustained bleed = worse)
+    headphoneBleedSegments.sort((a, b) => {
+      const durationA = a.endTime - a.startTime;
+      const durationB = b.endTime - b.startTime;
+      return durationB - durationA; // Longest first
+    });
 
     // Get top 5 of each
     const worstMicBleedSegments = micBleedSegments.slice(0, 5);
