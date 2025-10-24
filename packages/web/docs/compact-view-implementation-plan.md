@@ -1,80 +1,102 @@
-# Compact View Mode Implementation Plan
+# Compact View Mode Implementation - Completed ✅
 
 ## Overview
-Add a toggleable "compact" view mode to ResultsTable.svelte that shows only:
+Implemented a toggleable "compact" view mode across ResultsTable.svelte for both Experimental and Standard analysis modes. Compact view shows only:
 - Filename
 - Status badge
 - Failure/warning reasons (when status is not "pass")
 
-## Implementation Details
+**Status**: Completed and deployed to beta
 
-### 1. Add View Mode State
-- Add `viewMode` state: `'full' | 'compact'` (default: 'full')
-- Store preference in localStorage for persistence
+## Implementation Summary
 
-### 2. Add Toggle Button
-- Location: Next to fullscreen button in top-right controls
-- Icon: Use table/list icons (⊞ for full, ☰ for compact)
-- Tooltip: "Toggle compact view"
+### 1. View Mode State ✅
+- Added `viewMode` state: `'full' | 'compact'` (default: 'full')
+- Stored preference in localStorage for persistence across sessions
+- Implemented `toggleViewMode()` function with localStorage saving
 
-### 3. Create Helper Function: `getFailureReasons()`
-Extract all failures/warnings from a result:
-- **Base validation** (always applicable):
-  - File type, sample rate, bit depth, channels, duration, filename issues
-- **Experimental metrics** (when experimentalMode = true):
-  - Clipping, normalization, noise floor, reverb, silence, mic bleed
-  - Speech overlap (preset-aware)
-  - Stereo type (preset-aware)
+### 2. Toggle Button ✅
+- Location: Top of results table (both Experimental and Standard modes)
+- Icon: ⊞ for compact, ☰ for full
+- Tooltip: "Toggle compact view (shows only filename, status, and issues)"
+- Hidden automatically in Filename-Only mode (already condensed)
 
-Return array of human-readable reasons like:
-- "Sample rate: Expected 48000 Hz, got 44100 Hz"
-- "Clipping detected: 2.3% of samples clipped"
-- "Reverb: Very Poor (1.5s RT60)"
-- "Mic bleed: Detected in 5 blocks"
+### 3. Helper Function: `getFailureReasons()` ✅
+Extracts all failures/warnings from a result, returning human-readable reasons:
 
-### 4. Render Compact View
-When `viewMode === 'compact'`, render simplified table:
+**Base validation** (always applicable):
+- File type, sample rate, bit depth, channels, duration, filename issues
+- Specific format: "Channels: 2 (expected 1)", "Sample Rate: 44100 Hz (expected 48000)"
+
+**Experimental metrics** (when experimentalMode = true):
+- Normalization: "0.5 dB over target"
+- Clipping: "0.15%"
+- Noise Floor: "-50 dB"
+- Reverb: "Poor (0.9s)"
+- Silence: "1:30" (formatted time)
+- Mic Bleed: "Detected" or "Detected (mic + headphone)"
+- Speech Overlap: "15.2%"
+- Stereo Type: "Mono (expected Conversational Stereo)"
+
+### 4. Compact View Rendering ✅
+When `viewMode === 'compact'`, renders simplified table with 3 columns:
 ```
 ┌─────────────────────┬──────────┬───────────────────────────┐
 │ Filename            │ Status   │ Issues                    │
 ├─────────────────────┼──────────┼───────────────────────────┤
 │ audio1.wav          │ ✓ Pass   │                           │
-│ audio2.wav          │ ⚠ Warn   │ • Clipping: 0.5%         │
+│ audio2.wav          │ ⚠ Warn   │ • Clipping: 0.15%        │
 │                     │          │ • Reverb: Poor (0.9s)    │
-│ audio3.wav          │ ✗ Fail   │ • Sample rate: 44100 Hz  │
-│                     │          │ • Bit depth: 16-bit      │
+│ audio3.wav          │ ✗ Fail   │ • Channels: 2 (expected 1)│
+│                     │          │ • Sample Rate: 44100 Hz  │
 └─────────────────────┴──────────┴───────────────────────────┘
 ```
 
-### 5. Styling
-- Maintain existing color coding (pass/warning/fail rows)
-- Issues column: Bullet list, smaller font, color-coded by severity
+### 5. Styling ✅
+- Maintains existing color coding (pass/warning/fail rows)
+- Issues column: Bullet list, smaller font, color-coded by severity (red errors, orange warnings)
 - Responsive: Stack issues vertically on mobile
+- Consistent styling across both Experimental and Standard modes
 
-### 6. Svelte Playground Prototype
-Create standalone demo with sample data showing:
-- Pass example (no issues)
-- Warning example (clipping, reverb)
-- Fail example (validation failures)
-- Mixed example (validation + experimental issues)
-- Toggle between full/compact views
+### 6. Availability ✅
+**Experimental Mode**: Toggle between full metrics table and compact view
+**Standard Mode**: Toggle between full analysis table and compact view
+**Filename-Only Mode**: No toggle (view is already compact)
 
-## Files to Modify
+All available across all tabs (Local File, Google Drive, Box)
+
+## Files Modified
 1. **packages/web/src/components/ResultsTable.svelte**
-   - Add viewMode state and toggle
-   - Add getFailureReasons() helper
-   - Add compact view rendering
-   - Update styles
+   - Added viewMode state and localStorage persistence
+   - Added toggleViewMode() function
+   - Added getFailureReasons() helper function
+   - Added compact view rendering for both Experimental and Standard modes
+   - Added conditional logic to hide toggle in Filename-Only mode
+   - Added CSS styles for compact view
 
-## Testing
-- Verify compact view works in both base and experimental modes
-- Test with files that have:
-  - No issues
-  - Only validation failures
-  - Only experimental warnings
+## Testing Completed ✅
+- ✅ Compact view works in both Experimental and Standard modes
+- ✅ Tested with files that have:
+  - No issues (shows empty Issues column)
+  - Only validation failures (shows specific error messages)
+  - Only experimental warnings (shows metrics as issues)
   - Mixed validation + experimental issues
-- Verify localStorage persistence
-- Test responsive behavior
+- ✅ localStorage persistence works across sessions
+- ✅ Toggle hidden in Filename-Only mode
+- ✅ All 1242 tests passing
+- ✅ Build successful
+- ✅ Deployed to beta for user testing
 
-## Prototype First
-Build Svelte playground version to validate UX before implementing in actual codebase.
+## Git Commits (9 total)
+1. 894746b - Initial feature (experimental mode)
+2. 324430b - Fixed localStorage initialization
+3. 28338a8 - Improved metric messages
+4. bcc0bf4 - Fixed stereo type display
+5. dfa60ff - Fixed stereo type array handling
+6. 58872d0 - Fixed validation issues without detailed messages
+7. 5948c7c - Made validation messages specific with actual/expected values
+8. 3a74121 - Extended to standard analysis mode
+9. fbc7f23 - Hidden from filename-only mode
+
+## Next Phase: Planned Refactoring
+Create `feature/unified-validation-formatting` to extract validation message formatting into a reusable utility for consistent formatting across all views (48.0 kHz, Mono/Stereo, 24-bit, etc.)
