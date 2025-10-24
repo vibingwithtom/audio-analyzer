@@ -546,11 +546,14 @@
 
       // Stereo Type (preset-aware)
       if ($selectedPreset && result.stereoSeparation) {
-        const stereoClass = getStereoTypeClass(result);
-        if (stereoClass === 'error') {
+        const validation = CriteriaValidator.validateStereoType(
+          result.stereoSeparation,
+          $selectedPreset
+        );
+        if (validation && validation.status !== 'pass') {
           reasons.push({
-            reason: `Stereo Type: Expected different stereo type`,
-            severity: 'error'
+            reason: `Stereo Type: ${result.stereoSeparation.stereoType} (expected ${$selectedPreset.stereoType})`,
+            severity: validation.status === 'fail' ? 'error' : 'warning'
           });
         }
       }
