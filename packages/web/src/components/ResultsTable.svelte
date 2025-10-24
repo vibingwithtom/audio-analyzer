@@ -1708,7 +1708,52 @@
   </div>
   {:else}
     <!-- STANDARD MODE TABLE -->
-    <table class="results-table">
+    <div class="table-toolbar">
+      <button
+        class="view-mode-button"
+        onclick={toggleViewMode}
+        aria-label="Toggle compact view"
+        title="Toggle compact view (shows only filename, status, and issues)"
+      >
+        {viewMode === 'compact' ? '⊞' : '☰'}
+      </button>
+    </div>
+    {#if viewMode === 'compact'}
+      <!-- COMPACT VIEW FOR STANDARD MODE -->
+      <table class="compact-table">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Status</th>
+            <th>Issues</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each results as result, index (`${result.filename}-${index}`)}
+            {@const rowStatus = getAudioOnlyStatus(result)}
+            {@const failureReasons = getFailureReasons(result)}
+            <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
+              <td>{result.filename}</td>
+              <td><StatusBadge status={rowStatus} /></td>
+              <td>
+                {#if failureReasons.length > 0}
+                  <ul class="issues-list">
+                    {#each failureReasons as issue (issue.reason)}
+                      <li class="issue-item {issue.severity}">
+                        <span class="issue-bullet">•</span>
+                        <span class="issue-text">{issue.reason}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {:else}
+      <!-- FULL VIEW FOR STANDARD MODE -->
+      <table class="results-table">
     <thead>
       <tr>
         <th>Filename</th>
@@ -1809,5 +1854,6 @@
       {/each}
     </tbody>
   </table>
+    {/if}
   {/if}
 </div>
