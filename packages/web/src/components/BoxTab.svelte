@@ -451,13 +451,13 @@
 
         // Start new downloads up to concurrency limit
         while (inProgress.size < concurrency && index < boxFiles.length) {
-          // Check if cancelled before queueing new downloads
+          // Yield to event loop to allow cancellation effects to propagate
+          await Promise.resolve();
+
+          // Check if cancelled AFTER yielding to event loop
           if (batchCancelled) {
             break;
           }
-
-          // Yield to event loop to allow cancellation effects to propagate
-          await Promise.resolve();
 
           const boxFile = boxFiles[index];
           const taskId = index;
