@@ -35,11 +35,7 @@
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
   let isFullscreen = $state(false);
-  let viewMode = $state<'full' | 'compact'>(
-    typeof window !== 'undefined' && localStorage.getItem('resultsTableViewMode') === 'compact'
-      ? 'compact'
-      : 'full'
-  );
+  let viewMode = $state<'full' | 'compact'>('full');
 
   // Lazy blob URL management - create on-demand to prevent memory buildup
   // Use WeakMap keyed by result object to avoid issues with duplicate filenames
@@ -109,6 +105,16 @@
     viewMode = viewMode === 'full' ? 'compact' : 'full';
     localStorage.setItem('resultsTableViewMode', viewMode);
   }
+
+  // Load view mode preference from localStorage on mount
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('resultsTableViewMode');
+      if (saved === 'compact') {
+        viewMode = 'compact';
+      }
+    }
+  });
 
   // Handle ESC key to exit fullscreen
   function handleKeydown(event: KeyboardEvent) {
