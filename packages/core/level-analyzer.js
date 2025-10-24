@@ -1361,6 +1361,9 @@ export class LevelAnalyzer {
     const dominanceRatioThreshold = 1.5; // How much louder one channel must be to be "dominant"
     const silenceThreshold = 0.001; // RMS threshold for silence
     const separationThreshold = 15; // dB separation threshold for concern
+    const correlationThreshold = 0.3; // Threshold for detecting mic bleed via correlation
+    const audibleThreshold = -70; // dB threshold for detecting audible headphone bleed
+    const segmentMergeWindow = 2.0; // Seconds - merge segments within this time gap
 
     // OLD METHOD: Track bleed levels for averaging
     const leftBleedLevels = [];
@@ -1396,7 +1399,7 @@ export class LevelAnalyzer {
 
       if (ratio > dominanceRatioThreshold) {
         // Left channel is dominant, measure bleed in the right channel
-        const dominantDb = 20 * Math.log10(rmsLeft);
+        const dominantDb = rmsLeft > 0 ? 20 * Math.log10(rmsLeft) : -Infinity;
         const bleedDb = rmsRight > 0 ? 20 * Math.log10(rmsRight) : -Infinity;
         const separation = dominantDb - bleedDb;
 
@@ -1418,7 +1421,7 @@ export class LevelAnalyzer {
         }
       } else if (ratio < 1 / dominanceRatioThreshold) {
         // Right channel is dominant, measure bleed in the left channel
-        const dominantDb = 20 * Math.log10(rmsRight);
+        const dominantDb = rmsRight > 0 ? 20 * Math.log10(rmsRight) : -Infinity;
         const bleedDb = rmsLeft > 0 ? 20 * Math.log10(rmsLeft) : -Infinity;
         const separation = dominantDb - bleedDb;
 
@@ -1476,8 +1479,6 @@ export class LevelAnalyzer {
     // NEW METHOD: Cross-correlation for concerning blocks
     const confirmedMicBleed = []; // High correlation = same-room mic bleed
     const confirmedHeadphoneBleed = []; // Low correlation but audible = headphone bleed
-    const correlationThreshold = 0.3; // Lower threshold for speech correlation
-    const audibleThreshold = -70; // dB threshold for audible bleed
 
     for (const block of concerningBlocks) {
       const correlation = this.calculateCrossCorrelation(
@@ -1498,7 +1499,7 @@ export class LevelAnalyzer {
         });
       } else {
         // Low correlation - check if it's audible anyway (headphone bleed)
-        const quietChannelDb = 20 * Math.log10(block.bleedRms);
+        const quietChannelDb = block.bleedRms > 0 ? 20 * Math.log10(block.bleedRms) : -Infinity;
         if (quietChannelDb > audibleThreshold) {
           confirmedHeadphoneBleed.push({
             ...block,
@@ -1539,9 +1540,9 @@ export class LevelAnalyzer {
         const block = sortedBlocks[i];
         const prevBlock = sortedBlocks[i - 1];
 
-        // If blocks are close together (within 2 seconds) and same type, merge into same segment
+        // If blocks are close together (within segmentMergeWindow) and same type, merge into same segment
         // This allows merging even if some blocks in between don't meet the threshold
-        if (block.timestamp - prevBlock.endSample / sampleRate < 2.0 && block.type === currentSegment.type) {
+        if (block.timestamp - prevBlock.endSample / sampleRate < segmentMergeWindow && block.type === currentSegment.type) {
           currentSegment.endTime = block.endSample / sampleRate;
           currentSegment.maxCorrelation = Math.max(currentSegment.maxCorrelation, block.correlation);
           currentSegment.minSeparation = Math.min(currentSegment.minSeparation, block.separation);
