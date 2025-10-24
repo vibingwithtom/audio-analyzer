@@ -54,6 +54,9 @@
   let cancelRequested = $state(false);
   let batchFiles = $state<File[]>([]); // Store files for reprocessing
 
+  // Track previous state for auto-cancel logic
+  let previousAnalysisMode = $state<AnalysisMode | null>(null);
+
   // Cleanup blob URLs when component is destroyed
   function cleanup() {
     // Clean up single file audio URL
@@ -89,6 +92,34 @@
     }
   });
 
+  // Auto-cancel analysis when analysis mode changes during processing
+  $effect(() => {
+    const currentMode = $analysisMode;
+    if (processing && previousAnalysisMode !== null && previousAnalysisMode !== currentMode) {
+      // Mode changed while processing - auto-cancel
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - analysis mode changed';
+      cancelCurrentAnalysis();
+      cancelRequested = true; // For batch loop
+    }
+    previousAnalysisMode = currentMode;
+  });
+
+  // Auto-cancel analysis when switching away from this tab
+  $effect(() => {
+    // Explicitly depend on tab changes and processing state
+    $currentTab; // Add dependency tracking
+    processing;
+
+    if (processing && $currentTab !== 'local') {
+      // Switched away from local tab while processing - auto-cancel
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - switched tabs';
+      cancelCurrentAnalysis();
+      cancelRequested = true; // For batch loop
+    }
+  });
+
   async function processFile(file: File) {
     // Clean up previous blob URL if exists
     cleanup();
@@ -100,6 +131,9 @@
     resultsStale = false;
     resultsMode = null;
     currentFile = file;
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
 
     try {
       // Validate file type against current preset criteria BEFORE analyzing
@@ -221,6 +255,9 @@
     cancelRequested = false;
     resultsStale = false;
     resultsMode = $analysisMode;
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
 
     // Track batch start
     analyticsService.track('batch_processing_started', {

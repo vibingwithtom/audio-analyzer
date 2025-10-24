@@ -114,6 +114,9 @@
   let batchFolderUrl = $state(''); // URL of folder being processed
   let currentDisplayedFile = $state<string | null>(null); // Track which file is currently shown in progress bar
 
+  // Track previous state for auto-cancel logic
+  let previousAnalysisMode = $state<AnalysisMode | null>(null);
+
   // Cleanup blob URL when component is destroyed
   function cleanup() {
     if (currentAudioUrl) {
@@ -132,6 +135,48 @@
     if ((results || batchResults.length > 0) && resultsMode !== null) {
       // Always mark as stale if mode changed - require full reprocessing for proper status updates
       resultsStale = $analysisMode !== resultsMode;
+    }
+  });
+
+  // Auto-cancel analysis when analysis mode changes during processing
+  $effect(() => {
+    const currentMode = $analysisMode;
+    if ((processing || batchProcessing) && previousAnalysisMode !== null && previousAnalysisMode !== currentMode) {
+      // Mode changed while processing - auto-cancel
+      batchCancelled = true; // For batch loop
+
+      // Abort all in-flight downloads immediately
+      if (batchAbortController) {
+        batchAbortController.abort();
+      }
+
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - analysis mode changed';
+      cancelCurrentAnalysis();
+    }
+    previousAnalysisMode = currentMode;
+  });
+
+  // Auto-cancel analysis when switching away from this tab
+  $effect(() => {
+    // Explicitly depend on tab changes and processing state
+    $currentTab; // Add dependency tracking
+    processing;
+    batchProcessing;
+
+    if ((processing || batchProcessing) && $currentTab !== 'box') {
+      // Switched away from Box tab while processing - auto-cancel
+      // CRITICAL: Set cancellation flags immediately, before any async operations
+      batchCancelled = true; // For batch loop - stops file queueing immediately
+
+      // Abort all in-flight downloads immediately
+      if (batchAbortController) {
+        batchAbortController.abort();
+      }
+
+      analysisProgress.cancelling = true;
+      analysisProgress.message = 'Cancelled - switched tabs';
+      cancelCurrentAnalysis(); // Stop current audio analysis
     }
   });
 
@@ -170,6 +215,9 @@
     currentFile = file;
     analysisProgress.visible = false;
     analysisProgress.cancelling = false;
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
 
     try {
       // Validate file type against current preset criteria BEFORE analyzing
@@ -363,6 +411,9 @@
     }
   }
 
+  // Keep reference to abort controller globally so effects can abort it
+  let batchAbortController: AbortController | null = null;
+
   /**
    * Process multiple files in batch with parallel processing
    * @param boxFiles - Array of Box file metadata to process
@@ -379,6 +430,12 @@
     error = '';
     resultsMode = $analysisMode;
     currentDisplayedFile = null; // Reset the currently displayed file
+
+    // Create abort controller for this batch
+    batchAbortController = new AbortController();
+
+    // Initialize tracking for auto-cancel logic
+    previousAnalysisMode = $analysisMode;
 
     // Show progress bar immediately
     analysisProgress.visible = true;
@@ -405,13 +462,20 @@
 
         // Check if cancelled
         if (batchCancelled) {
-          // Wait for in-progress downloads to complete
-          await Promise.allSettled(Array.from(inProgress.values()));
+          // Stop immediately - AbortController handles cancelling in-flight requests
           break;
         }
 
         // Start new downloads up to concurrency limit
         while (inProgress.size < concurrency && index < boxFiles.length) {
+          // Yield to event loop to allow cancellation effects to propagate
+          await Promise.resolve();
+
+          // Check if cancelled AFTER yielding to event loop
+          if (batchCancelled) {
+            break;
+          }
+
           const boxFile = boxFiles[index];
           const taskId = index;
           index++;
@@ -465,6 +529,11 @@
                 return;
               }
 
+              // Check if cancelled before downloading
+              if (batchCancelled) {
+                return;
+              }
+
               // Check if filename-only mode - don't download the actual file
               let file: File;
               if ($analysisMode === 'filename-only') {
@@ -475,7 +544,8 @@
                 // Pass mode and filename for optimization (WAV files use partial download)
                 file = await boxAPI!.downloadFile(boxFile.id, undefined, {
                   mode: $analysisMode,
-                  filename: boxFile.name
+                  filename: boxFile.name,
+                  signal: batchAbortController?.signal
                 });
               }
 
@@ -501,7 +571,15 @@
                 // No need to add to results, just stop this worker
                 return;
               }
-              // Log error for debugging
+
+              // Check if this is an abort error from cancellation
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              if (errorMessage.includes('aborted') || errorMessage.includes('abort')) {
+                // Silently ignore abort errors - they're expected when cancelling
+                return;
+              }
+
+              // Log actual errors for debugging
               console.error(`Error processing ${boxFile.name}:`, err);
 
               // Add error result
@@ -514,7 +592,7 @@
                 bitDepth: 0,
                 duration: 0,
                 status: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error'
+                error: errorMessage
               };
               batchResults = [...batchResults, errorResult];
               processedFiles = batchResults.length;
@@ -582,6 +660,12 @@
     batchCancelled = true;
     analysisProgress.cancelling = true;
     analysisProgress.message = 'Cancelling...';
+
+    // Abort all in-flight network requests
+    if (batchAbortController) {
+      batchAbortController.abort();
+    }
+
     cancelCurrentAnalysis();
   }
 

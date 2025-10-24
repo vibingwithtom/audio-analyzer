@@ -139,6 +139,15 @@
 </script>
 
 <style>
+  /* Tab content visibility - keep components mounted but hide when not active */
+  .tab-content {
+    display: block;
+  }
+
+  .tab-content.hidden {
+    display: none;
+  }
+
   /* Root app container */
   .app {
     min-height: 100vh;
@@ -268,16 +277,19 @@
       <!-- Tab Navigation -->
       <TabNavigation />
 
-      <!-- Tab Content -->
-      {#if $currentTab === 'local'}
+      <!-- Tab Content - Keep all components mounted to preserve state and allow cancellation -->
+      <div class="tab-content" class:hidden={$currentTab !== 'local'}>
         <LocalFileTab />
-      {:else if $currentTab === 'googleDrive'}
+      </div>
+      <div class="tab-content" class:hidden={$currentTab !== 'googleDrive'}>
         <GoogleDriveTab />
-      {:else if $currentTab === 'box'}
+      </div>
+      <div class="tab-content" class:hidden={$currentTab !== 'box'}>
         <BoxTab />
-      {:else if $currentTab === 'settings'}
+      </div>
+      <div class="tab-content" class:hidden={$currentTab !== 'settings'}>
         <SettingsTab />
-      {/if}
+      </div>
     </div>
   </main>
 

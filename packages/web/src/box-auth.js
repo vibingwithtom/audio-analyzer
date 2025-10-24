@@ -140,7 +140,7 @@ class BoxAuth {
     }
   }
 
-  async downloadFile(fileId, sharedLink = null) {
+  async downloadFile(fileId, sharedLink = null, signal = null) {
     try {
       // Use authenticated access with Box API
       const token = await this.getValidToken();
@@ -152,7 +152,7 @@ class BoxAuth {
       // First get file metadata
       const metaResponse = await fetch(
         `${BOX_CONFIG.API_URL}/files/${fileId}`,
-        { headers }
+        { headers, signal }
       );
 
       if (!metaResponse.ok) {
@@ -170,7 +170,7 @@ class BoxAuth {
       // Download the actual file
       const fileResponse = await fetch(
         `${BOX_CONFIG.API_URL}/files/${fileId}/content`,
-        { headers }
+        { headers, signal }
       );
 
       if (!fileResponse.ok) {
@@ -279,7 +279,7 @@ class BoxAuth {
     }
   }
 
-  async downloadFileHeaders(fileId, bytesLimit = null, sharedLink = null) {
+  async downloadFileHeaders(fileId, bytesLimit = null, sharedLink = null, signal = null) {
     // Use bytesLimit from settings if not explicitly provided
     if (bytesLimit === null) {
       bytesLimit = SettingsManager.getDownloadChunkSize();
@@ -299,7 +299,7 @@ class BoxAuth {
 
       const response = await fetch(
         `${BOX_CONFIG.API_URL}/files/${fileId}/content`,
-        { headers }
+        { headers, signal }
       );
 
       if (!response.ok && response.status !== 206) {

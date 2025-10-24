@@ -1,6 +1,14 @@
 <script lang="ts">
   import StatusBadge from './StatusBadge.svelte';
   import { formatSampleRate, formatDuration, formatBitDepth, formatChannels, formatBytes } from '../utils/format-utils';
+  import {
+    formatValidationMessage,
+    splitValidationErrors,
+    formatSilenceTime,
+    formatDb,
+    formatPercent,
+    formatReverbTime
+  } from '../utils/validation-formatting';
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
@@ -35,6 +43,7 @@
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
   let isFullscreen = $state(false);
+  let viewMode = $state<'full' | 'compact'>('full');
 
   // Lazy blob URL management - create on-demand to prevent memory buildup
   // Use WeakMap keyed by result object to avoid issues with duplicate filenames
@@ -98,6 +107,22 @@
   function toggleFullscreen() {
     isFullscreen = !isFullscreen;
   }
+
+  // View mode toggle with localStorage persistence
+  function toggleViewMode() {
+    viewMode = viewMode === 'full' ? 'compact' : 'full';
+    localStorage.setItem('resultsTableViewMode', viewMode);
+  }
+
+  // Load view mode preference from localStorage on mount
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('resultsTableViewMode');
+      if (saved === 'compact') {
+        viewMode = 'compact';
+      }
+    }
+  });
 
   // Handle ESC key to exit fullscreen
   function handleKeydown(event: KeyboardEvent) {
@@ -192,13 +217,12 @@
     if (!result.validation) return [];
     const issues: string[] = [];
 
-    // Collect all validation issues
+    // Collect all validation issues using shared formatting utility
     Object.entries(result.validation).forEach(([field, validation]) => {
       if (validation.issue) {
-        // Split concatenated error messages
-        // Pattern: Capital letter after lowercase letter or closing paren indicates new error
-        const splitErrors = validation.issue.split(/(?<=[a-z\)])(?=[A-Z])/);
-        issues.push(...splitErrors.map(err => err.trim()).filter(err => err.length > 0));
+        // Use shared splitValidationErrors utility (splits on newlines first, then case boundaries)
+        const splitErrors = splitValidationErrors(validation.issue);
+        issues.push(...splitErrors);
       }
     });
 
@@ -386,6 +410,171 @@
 
     return Math.max(...segments.map(seg => seg.duration));
   }
+
+  /**
+   * Extract all failure/warning reasons from a result for compact view
+   * Returns human-readable array of issues
+   */
+  function getFailureReasons(result: AudioResults): { reason: string; severity: 'error' | 'warning' }[] {
+    const reasons: { reason: string; severity: 'error' | 'warning' }[] = [];
+
+    // BASE VALIDATION (always applicable)
+    if (result.validation) {
+      Object.entries(result.validation).forEach(([field, validation]) => {
+        // Only show fail/warning statuses, not pass
+        if (validation.status === 'fail' || validation.status === 'warning') {
+          const severity = validation.status === 'fail' ? 'error' : 'warning';
+
+          if (validation.issue) {
+            // Split concatenated error messages using shared utility
+            const splitErrors = splitValidationErrors(validation.issue);
+            splitErrors.forEach(err => {
+              reasons.push({ reason: err, severity });
+            });
+          } else {
+            // If no issue message, generate a specific formatted one using shared utility
+            const message = formatValidationMessage(field, validation, validation.status);
+            reasons.push({ reason: message, severity });
+          }
+        }
+      });
+    }
+
+    // EXPERIMENTAL METRICS (only if experimentalMode = true)
+    if (experimentalMode) {
+      // Normalization
+      if (result.normalizationStatus) {
+        const normStatus = getNormalizationStatus(result.normalizationStatus);
+        if (normStatus === 'warning') {
+          const distance = Math.abs(
+            (result.normalizationStatus.peakDb || 0) - (result.normalizationStatus.targetDb || -6)
+          );
+          reasons.push({
+            reason: `Normalization: ${distance.toFixed(1)} dB ${result.normalizationStatus.status === 'too_loud' ? 'over' : 'under'} target`,
+            severity: 'warning'
+          });
+        }
+      }
+
+      // Clipping
+      if (result.clippingAnalysis) {
+        const severity = getClippingStatus(result.clippingAnalysis);
+        if (severity === 'error' || severity === 'warning') {
+          const { severity: sev } = getClippingSeverity(result.clippingAnalysis);
+          const severityLevel = sev === 'error' ? 'error' : 'warning';
+          reasons.push({
+            reason: `Clipping: ${formatPercent(result.clippingAnalysis.clippedPercentage)}`,
+            severity: severityLevel
+          });
+        }
+      }
+
+      // Noise Floor
+      if (result.noiseFloorDb !== undefined) {
+        const severity = getNoiseFloorStatus(result.noiseFloorDb);
+        if (severity === 'error' || severity === 'warning') {
+          reasons.push({
+            reason: `Noise Floor: ${formatDb(result.noiseFloorDb)}`,
+            severity: severity === 'error' ? 'error' : 'warning'
+          });
+        }
+      }
+
+      // Reverb (RT60)
+      if (result.reverbInfo) {
+        const severity = getReverbClass(result.reverbInfo.label);
+        if (severity === 'error' || severity === 'warning') {
+          reasons.push({
+            reason: `Reverb: ${formatReverbTime(result.reverbInfo.label, result.reverbInfo.time)}`,
+            severity: severity === 'error' ? 'error' : 'warning'
+          });
+        }
+      }
+
+      // Silence (lead/trail/max)
+      const hasLeadingSilenceIssue = result.leadingSilence !== undefined && getSilenceClass(result.leadingSilence, 'lead-trail') !== 'success';
+      const hasTrailingSilenceIssue = result.trailingSilence !== undefined && getSilenceClass(result.trailingSilence, 'lead-trail') !== 'success';
+      const hasMaxSilenceIssue = result.longestSilence !== undefined && getSilenceClass(result.longestSilence, 'max') !== 'success';
+
+      if (hasLeadingSilenceIssue) {
+        reasons.push({
+          reason: `Leading Silence: ${formatSilenceTime(result.leadingSilence)}`,
+          severity: 'warning'
+        });
+      }
+      if (hasTrailingSilenceIssue) {
+        reasons.push({
+          reason: `Trailing Silence: ${formatSilenceTime(result.trailingSilence)}`,
+          severity: 'warning'
+        });
+      }
+      if (hasMaxSilenceIssue) {
+        reasons.push({
+          reason: `Max Silence: ${formatSilenceTime(result.longestSilence)}`,
+          severity: 'warning'
+        });
+      }
+
+      // Mic Bleed
+      const micBleedClass = getUnifiedMicBleedClass(result.micBleed);
+      if (micBleedClass === 'error' || micBleedClass === 'warning') {
+        const micBleedCount = result.micBleed?.new?.confirmedMicBleed || 0;
+        const headphoneBleedCount = result.micBleed?.new?.confirmedHeadphoneBleed || 0;
+
+        if (micBleedCount > 0 && headphoneBleedCount > 0) {
+          reasons.push({
+            reason: `Mic Bleed: Detected (mic + headphone)`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else if (micBleedCount > 0) {
+          reasons.push({
+            reason: `Mic Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else if (headphoneBleedCount > 0) {
+          reasons.push({
+            reason: `Headphone Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        } else {
+          // Fallback if old method detected it
+          reasons.push({
+            reason: `Mic Bleed: Detected`,
+            severity: micBleedClass === 'error' ? 'error' : 'warning'
+          });
+        }
+      }
+
+      // Speech Overlap (preset-aware)
+      if ($selectedPreset && result.conversationalAnalysis?.overlap) {
+        const overlapClass = getOverlapClass(result);
+        if (overlapClass === 'error' || overlapClass === 'warning') {
+          reasons.push({
+            reason: `Speech Overlap: ${formatPercent(result.conversationalAnalysis.overlap.overlapPercentage)}`,
+            severity: overlapClass === 'error' ? 'error' : 'warning'
+          });
+        }
+      }
+
+      // Stereo Type (preset-aware)
+      if ($selectedPreset) {
+        const validation = CriteriaValidator.validateStereoType(
+          result.stereoSeparation,
+          $selectedPreset
+        );
+        if (validation && validation.status !== 'pass') {
+          const detected = result.stereoSeparation?.stereoType || 'Not a stereo file';
+          const expected = $selectedPreset.stereoType?.join(' or ') || 'specific type';
+          reasons.push({
+            reason: `Stereo Type: ${detected} (expected ${expected})`,
+            severity: 'error' // Stereo type validation is binary: pass/fail
+          });
+        }
+      }
+    }
+
+    return reasons;
+  }
 </script>
 
 <style>
@@ -486,8 +675,11 @@
   }
 
   .error-details-cell {
-    white-space: pre-line;
     line-height: 1.6;
+    min-width: 300px;
+    max-width: 600px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .error-line {
@@ -500,6 +692,28 @@
   }
 
   .error-line:last-child {
+    margin-bottom: 0;
+  }
+
+  .validation-errors {
+    list-style: disc;
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .validation-errors li {
+    margin: 0.25rem 0;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  .validation-errors li:first-child {
+    margin-top: 0;
+  }
+
+  .validation-errors li:last-child {
     margin-bottom: 0;
   }
 
@@ -786,6 +1000,152 @@
   .conversational-cell {
     cursor: help;
   }
+
+  /* Compact view toggle button */
+  .view-mode-button {
+    background: var(--bg-secondary, #f5f5f5);
+    border: 1px solid var(--bg-tertiary, #e0e0e0);
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    z-index: 100;
+    position: relative;
+    margin-right: 0.5rem;
+  }
+
+  .view-mode-button:hover {
+    background: var(--bg-tertiary, #e0e0e0);
+    transform: scale(1.05);
+  }
+
+  .view-mode-button:active {
+    transform: scale(0.95);
+  }
+
+  /* Compact view table styling */
+  .compact-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--bg-primary, #ffffff);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .compact-table th,
+  .compact-table td {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--bg-tertiary, #e0e0e0);
+  }
+
+  .compact-table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary, #666666);
+    background: var(--bg-secondary, #f5f5f5);
+    border-bottom: 2px solid var(--bg-tertiary, #e0e0e0);
+  }
+
+  .compact-table tbody tr {
+    transition: background-color 0.15s ease;
+  }
+
+  .compact-table tbody tr:hover {
+    background: var(--bg-secondary, #f5f5f5);
+  }
+
+  .compact-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .compact-table td {
+    font-size: 0.9375rem;
+  }
+
+  /* Compact row status tinting */
+  .compact-table tbody tr.status-fail {
+    background-color: rgba(244, 67, 54, 0.05);
+  }
+
+  .compact-table tbody tr.status-warning {
+    background-color: rgba(255, 152, 0, 0.05);
+  }
+
+  .compact-table tbody tr.status-pass {
+    background-color: rgba(76, 175, 80, 0.05);
+  }
+
+  :global([data-theme="dark"]) .compact-table tbody tr.status-fail {
+    background-color: rgba(244, 67, 54, 0.15);
+  }
+
+  :global([data-theme="dark"]) .compact-table tbody tr.status-warning {
+    background-color: rgba(255, 152, 0, 0.15);
+  }
+
+  :global([data-theme="dark"]) .compact-table tbody tr.status-pass {
+    background-color: rgba(76, 175, 80, 0.15);
+  }
+
+  /* Issues list in compact view */
+  .issues-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .issue-item {
+    display: flex;
+    align-items: flex-start;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    gap: 0.5rem;
+  }
+
+  .issue-item.error {
+    color: var(--danger, #f44336);
+  }
+
+  .issue-item.warning {
+    color: var(--warning, #ff9800);
+  }
+
+  .issue-bullet {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .issue-text {
+    flex: 1;
+    word-break: break-word;
+  }
+
+  /* Filename column in compact view */
+  .compact-table td:first-child {
+    font-weight: 500;
+    max-width: 200px;
+    word-break: break-word;
+  }
+
+  /* Status column in compact view */
+  .compact-table td:nth-child(2) {
+    width: 120px;
+  }
+
+  /* Issues column - should take remaining space */
+  .compact-table td:nth-child(3) {
+    padding-right: 2rem;
+  }
 </style>
 
 <div class="results-container">
@@ -794,6 +1154,14 @@
     <div class="experimental-table-container" class:fullscreen={isFullscreen}>
       <!-- Table header with expand button -->
       <div class="table-toolbar">
+        <button
+          class="view-mode-button"
+          onclick={toggleViewMode}
+          aria-label="Toggle compact view"
+          title="Toggle compact view (shows only filename, status, and issues)"
+        >
+          {viewMode === 'compact' ? '⊞' : '☰'}
+        </button>
         <button
           class="expand-button"
           onclick={toggleFullscreen}
@@ -806,7 +1174,42 @@
       <!-- Wrapper for table + scroll controls (clips buttons at table boundaries) -->
       <div class="table-with-controls">
         <div class="experimental-table-wrapper" bind:this={tableWrapper}>
-          <table class="results-table">
+          {#if viewMode === 'compact'}
+            <!-- COMPACT VIEW TABLE -->
+            <table class="compact-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Status</th>
+                  <th>Issues</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each results as result, index (`${result.filename}-${index}`)}
+                  {@const rowStatus = getExperimentalRowStatus(result)}
+                  {@const failureReasons = getFailureReasons(result)}
+                  <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
+                    <td>{result.filename}</td>
+                    <td><StatusBadge status={rowStatus} /></td>
+                    <td>
+                      {#if failureReasons.length > 0}
+                        <ul class="issues-list">
+                          {#each failureReasons as issue (issue.reason)}
+                            <li class="issue-item {issue.severity}">
+                              <span class="issue-bullet">•</span>
+                              <span class="issue-text">{issue.reason}</span>
+                            </li>
+                          {/each}
+                        </ul>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {:else}
+            <!-- FULL VIEW TABLE -->
+            <table class="results-table">
         <thead>
           <tr>
             <th>Filename</th>
@@ -1284,6 +1687,7 @@
           {/each}
         </tbody>
       </table>
+          {/if}
     </div>
     <!-- Shadow gradient overlay - positioned relative to table-with-controls wrapper -->
     <div class="scroll-shadow" class:visible={hasHorizontalScroll}></div>
@@ -1308,7 +1712,54 @@
   </div>
   {:else}
     <!-- STANDARD MODE TABLE -->
-    <table class="results-table">
+    {#if !metadataOnly}
+      <div class="table-toolbar">
+        <button
+          class="view-mode-button"
+          onclick={toggleViewMode}
+          aria-label="Toggle compact view"
+          title="Toggle compact view (shows only filename, status, and issues)"
+        >
+          {viewMode === 'compact' ? '⊞' : '☰'}
+        </button>
+      </div>
+    {/if}
+    {#if viewMode === 'compact' && !metadataOnly}
+      <!-- COMPACT VIEW FOR STANDARD MODE -->
+      <table class="compact-table">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Status</th>
+            <th>Issues</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each results as result, index (`${result.filename}-${index}`)}
+            {@const rowStatus = getAudioOnlyStatus(result)}
+            {@const failureReasons = getFailureReasons(result)}
+            <tr class:status-pass={rowStatus === 'pass'} class:status-warning={rowStatus === 'warning'} class:status-fail={rowStatus === 'fail'}>
+              <td>{result.filename}</td>
+              <td><StatusBadge status={rowStatus} /></td>
+              <td>
+                {#if failureReasons.length > 0}
+                  <ul class="issues-list">
+                    {#each failureReasons as issue (issue.reason)}
+                      <li class="issue-item {issue.severity}">
+                        <span class="issue-bullet">•</span>
+                        <span class="issue-text">{issue.reason}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {:else if metadataOnly || viewMode === 'full'}
+      <!-- FULL VIEW FOR STANDARD MODE -->
+      <table class="results-table">
     <thead>
       <tr>
         <th>Filename</th>
@@ -1343,7 +1794,15 @@
           {#if metadataOnly}
             <!-- Filename-only mode: Show error details inline -->
             <td class="error-details-cell">
-              {getValidationIssue(result, 'filename') || '—'}
+              {#if getValidationIssue(result, 'filename')}
+                <ul class="validation-errors">
+                  {#each splitValidationErrors(getValidationIssue(result, 'filename') || '') as error}
+                    <li>{error}</li>
+                  {/each}
+                </ul>
+              {:else}
+                —
+              {/if}
             </td>
           {:else}
             <!-- Full analysis mode: Show all columns -->
@@ -1409,5 +1868,6 @@
       {/each}
     </tbody>
   </table>
+    {/if}
   {/if}
 </div>

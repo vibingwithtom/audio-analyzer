@@ -196,7 +196,7 @@ class GoogleAuth {
     }
   }
 
-  async downloadFile(fileId) {
+  async downloadFile(fileId, signal = null) {
     const token = await this.getValidToken();
 
     try {
@@ -206,7 +206,8 @@ class GoogleAuth {
         {
           headers: {
             'Authorization': `Bearer ${token.access_token}`
-          }
+          },
+          signal: signal
         }
       );
 
@@ -227,7 +228,8 @@ class GoogleAuth {
         {
           headers: {
             'Authorization': `Bearer ${token.access_token}`
-          }
+          },
+          signal: signal
         }
       );
 
@@ -341,7 +343,7 @@ class GoogleAuth {
     }
   }
 
-  async downloadFileHeaders(fileId, bytesLimit = null) {
+  async downloadFileHeaders(fileId, bytesLimit = null, signal = null) {
     // Use bytesLimit from settings if not explicitly provided
     if (bytesLimit === null) {
       bytesLimit = SettingsManager.getDownloadChunkSize();
@@ -357,7 +359,8 @@ class GoogleAuth {
           headers: {
             'Authorization': `Bearer ${token.access_token}`,
             'Range': `bytes=0-${bytesLimit - 1}`
-          }
+          },
+          signal: signal
         }
       );
 
