@@ -116,11 +116,11 @@ export class BoxAPI {
       // Full download needed for:
       // - Experimental mode (any format - needs full audio for analysis)
       // - Non-WAV files (MP3, FLAC, etc. - Web Audio API requires complete file)
-      return await this.boxAuth.downloadFile(fileId, (sharedLink || null) as any, options?.signal);
+      return await this.boxAuth.downloadFile(fileId, (sharedLink || null) as any, options?.signal || null);
     } else {
       // Partial download optimization for WAV files in audio-only/full mode
       // WAV headers contain all metadata, optimized to 10KB chunk size
-      const partialBlob = await this.boxAuth.downloadFileHeaders(fileId, undefined, (sharedLink || null) as any, options?.signal);
+      const partialBlob = await this.boxAuth.downloadFileHeaders(fileId, undefined, (sharedLink || null) as any, options?.signal || null);
       const metadata = await this.getFileMetadata(fileId, sharedLink);
       const file = new File([partialBlob], metadata.name, { type: 'audio/wav' });
 
