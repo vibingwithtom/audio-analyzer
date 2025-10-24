@@ -160,10 +160,11 @@
 
     if ((processing || batchProcessing) && $currentTab !== 'box') {
       // Switched away from Box tab while processing - auto-cancel
+      // CRITICAL: Set cancellation flags immediately, before any async operations
+      batchCancelled = true; // For batch loop - stops file queueing immediately
       analysisProgress.cancelling = true;
       analysisProgress.message = 'Cancelled - switched tabs';
-      cancelCurrentAnalysis();
-      batchCancelled = true; // For batch loop
+      cancelCurrentAnalysis(); // Stop current audio analysis
     }
   });
 
