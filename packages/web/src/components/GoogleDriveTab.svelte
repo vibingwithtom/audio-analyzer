@@ -367,8 +367,7 @@
       while (index < driveFiles.length || inProgress.size > 0) {
         // Check if cancelled
         if (batchCancelled) {
-          // Wait for in-progress downloads to complete
-          await Promise.allSettled(Array.from(inProgress.values()));
+          // Stop immediately - AbortController handles cancelling in-flight requests
           break;
         }
 
@@ -561,6 +560,12 @@
     batchCancelled = true;
     analysisProgress.cancelling = true;
     analysisProgress.message = 'Cancelling...';
+
+    // Abort all in-flight network requests
+    if (batchAbortController) {
+      batchAbortController.abort();
+    }
+
     cancelCurrentAnalysis();
   }
 
