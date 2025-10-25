@@ -1,0 +1,36 @@
+## Cloudflare Pages Configuration
+## See https://developers.cloudflare.com/pages/configuration/
+
+name = "audio-analyzer"
+type = "javascript"
+main = "packages/web/dist/index.html"
+compatibility_date = "2025-10-24"
+
+[build]
+command = "npm run build --workspace=@audio-analyzer/web"
+destination = "packages/web/dist"
+watch_paths = ["packages/web/src/**/*.{ts,js,svelte}"]
+
+[env.production]
+name = "audio-analyzer"
+routes = [
+  { pattern = "audio-analyzer.tinytech.site", zone_name = "tinytech.site" }
+]
+
+[env.staging]
+name = "audio-analyzer-staging"
+routes = [
+  { pattern = "beta.audio-analyzer.tinytech.site", zone_name = "tinytech.site" }
+]
+
+## Analytics & Features
+[analytics]
+enabled = true
+
+## Build optimization
+[build.upload]
+format = "service-worker"
+
+## Observability
+[observability]
+enabled = true
