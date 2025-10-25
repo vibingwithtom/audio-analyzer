@@ -173,19 +173,48 @@ Button shows actual format:
 
 ---
 
-## Phase 1.5 Validation
+## PHASE 1.5 VALIDATION & CRITICAL FINDINGS
+
+### Key Discoveries ✅❌
+
+1. ✅ **MediaRecorder doesn't guarantee uncompressed PCM WAV**
+   - Root cause: Browser implementation variations
+   - Solution: Use RecordRTC for guaranteed PCM
+
+2. ✅ **RecordRTC provides reliable PCM WAV recording**
+   - Works across all browsers (Chrome, Firefox, Safari, Edge)
+   - Uncompressed format guaranteed
+   - Sample rates honored (48kHz, 44.1kHz)
+   - Channels honored (Mono, Stereo)
+
+3. ❌ **RecordRTC appears to ONLY support 16-bit recording**
+   - CRITICAL: 24-bit requests are silently converted to 16-bit
+   - This is a RecordRTC library limitation
+   - **Decision point for Phase 2**: Accept 16-bit or find alternative
 
 ### What This Proves ✅
-1. **Real-world requirement identified** - WAV support can't be assumed
-2. **Solution works** - Format fallback handles all cases
-3. **Graceful degradation** - No crashes, just different format
-4. **User experience intact** - Recording, validation, download all work
+1. **Real-world requirement identified** - 24-bit bit depth support uncertain
+2. **Solution partially works** - RecordRTC provides PCM WAV but not 24-bit
+3. **Graceful validation** - POC truthfully reports actual vs requested
+4. **User feedback** - Clear warnings when specs aren't met
 
 ### What We Need for Phase 2
-1. **Keep format detection** - Use this approach in SvelteKit version
-2. **Consider RecordRTC** - For more control if WebM/OGG quality insufficient
-3. **Format preferences** - May need to let users select preferred format
-4. **Cloud storage** - Handle multiple formats when uploading
+
+**Decision Required**: What bit depth is acceptable?
+
+**Option A: Accept 16-bit** (Recommended based on Phase 1.5)
+- ✅ RecordRTC works perfectly for 16-bit PCM WAV
+- ✅ Simpler implementation
+- ✅ Works across all browsers
+- ⚠️ Would need to update Character Recordings preset to 16-bit instead of 24-bit
+
+**Option B: Find 24-bit solution** (If 24-bit is critical)
+- 🔍 Investigate alternative recording libraries
+- 🔍 Consider native Web Audio API + offline processing (complex)
+- 🔍 Check if other JavaScript audio libraries support 24-bit
+- ⚠️ May require more complex implementation
+
+**Current Recommendation**: Accept 16-bit, update presets to match RecordRTC capabilities
 
 ---
 
@@ -256,10 +285,36 @@ state.recorder = new RecordRTC(stream, {
 });
 ```
 
+### IMPORTANT DISCOVERY: RecordRTC Bit Depth Limitation
+
+**Critical Finding**: RecordRTC appears to only support **16-bit recording**, not 24-bit.
+
+Even when configured with:
+```javascript
+bitsPerSample: 24
+```
+
+The resulting WAV file contains:
+```
+Bit Depth: 16-bit (actual in file)
+```
+
+**Implications for Phase 2:**
+1. ⚠️ If 24-bit is a hard requirement, RecordRTC won't work
+2. ✅ If 16-bit is acceptable, RecordRTC works great
+3. 🔍 Need to investigate alternative libraries if 24-bit is required
+4. 📋 May need to update project requirements to accept 16-bit recording
+
+**Current Status:**
+- ✅ 16-bit PCM WAV recording works reliably
+- ✅ Sample rates respected (48kHz, 44.1kHz)
+- ✅ Channels respected (Mono, Stereo)
+- ❌ 24-bit recording appears unsupported by RecordRTC
+
 ### Success Metrics for Phase 2
 - ✅ All recordings are true PCM WAV
 - ✅ Sample rates exact match presets
-- ✅ Bit depths exact match presets
+- ⚠️ Bit depths: 16-bit confirmed, 24-bit needs alternative
 - ✅ Channels exact match presets
 - ✅ WAV header validation passes
 - ✅ Works on Chrome, Firefox, Safari, Edge
