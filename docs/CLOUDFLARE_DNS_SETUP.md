@@ -3,49 +3,46 @@
 ## Current Status
 
 ✅ **Production Domain**: audio-analyzer.tinytech.site
-- DNS CNAME: Already configured → `audio-analyzer.pages.dev`
+- DNS CNAME: `audio-analyzer.pages.dev`
 - Status: Active
+- Deployment: main branch
 
-⏳ **Beta Domain**: beta.audio-analyzer.tinytech.site
-- DNS CNAME: Needs to be created
-- Target: `audio-analyzer.pages.dev`
+✅ **Beta Domain**: beta.audio-analyzer.tinytech.site
+- DNS CNAME: `staging.audio-analyzer.pages.dev`
+- Status: Active
+- Deployment: staging branch
 
-## Manual DNS Setup Required
+## DNS Configuration (Completed)
 
-The Cloudflare API token has Pages permissions but not DNS permissions. You need to manually create the beta DNS record:
+Both production and beta DNS records are configured and working:
 
-### Steps:
+### Production CNAME
+```
+Type:    CNAME
+Name:    audio-analyzer
+Target:  audio-analyzer.pages.dev
+Proxy:   ON (orange cloud)
+```
 
-1. **Go to Cloudflare Dashboard**
-   - Navigate to: https://dash.cloudflare.com
-   - Select the `tinytech.site` zone
-
-2. **Add DNS Record**
-   - Click "DNS" in the left sidebar
-   - Click "Add record"
-
-3. **Configure CNAME Record**
-   ```
-   Type:    CNAME
-   Name:    beta.audio-analyzer
-   Target:  audio-analyzer.pages.dev
-   Proxy:   ON (orange cloud)
-   TTL:     Auto
-   ```
-
-4. **Save**
-   - Click "Save"
-   - Wait 1-2 minutes for propagation
+### Beta CNAME
+```
+Type:    CNAME
+Name:    beta.audio-analyzer
+Target:  staging.audio-analyzer.pages.dev
+Proxy:   ON (orange cloud)
+```
 
 ## Verification
 
-After creating the DNS record, verify it works:
+Both domains are resolving and serving content:
 
 ```bash
 # Check DNS resolution
-dig beta.audio-analyzer.tinytech.site
+dig audio-analyzer.tinytech.site CNAME
+dig beta.audio-analyzer.tinytech.site CNAME
 
 # Test HTTPS
+curl -I https://audio-analyzer.tinytech.site
 curl -I https://beta.audio-analyzer.tinytech.site
 ```
 
@@ -55,10 +52,13 @@ curl -I https://beta.audio-analyzer.tinytech.site
 - **staging** branch → https://beta.audio-analyzer.tinytech.site
 - **feature/** branches → https://<commit-id>.audio-analyzer.pages.dev (preview URLs)
 
-## GitHub Pages Transition
+## Migration Complete ✅
 
-Once Cloudflare Pages is proven stable:
+Transition from GitHub Pages to Cloudflare Pages is complete:
 
-1. Keep GitHub Actions CI/CD for testing
-2. Remove GitHub Pages deployment step
-3. Let Cloudflare Pages handle all deployments automatically
+- ✅ GitHub Pages deployment workflows removed
+- ✅ Cloudflare Pages handles all deployments automatically
+- ✅ GitHub Actions runs CI tests only (no longer deploys)
+- ✅ Environment banners implemented (dev/preview/beta/production)
+- ✅ DNS configured for production and beta subdomains
+- ✅ All three deployment environments working (production, beta, preview)
