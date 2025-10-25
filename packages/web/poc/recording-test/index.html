@@ -931,12 +931,13 @@
                 log(`WAV24Encoder created: ${preset.sampleRate}Hz, ${preset.channels} channels, ${preset.bitDepth}-bit`);
 
                 // Create ScriptProcessorNode to capture samples
-                // Must match preset channels (1 for mono, 2 for stereo)
+                // Note: Microphones always provide mono (1 channel) input
+                // Even if preset is stereo, we capture mono and duplicate if needed
                 const bufferSize = 4096;
                 state.processorNode = state.audioContext.createScriptProcessor(
                     bufferSize,
-                    preset.channels,  // Input channels from preset
-                    preset.channels   // Output channels from preset
+                    1,                 // Microphone input: always 1 channel (mono)
+                    1                  // Processor output: always 1 channel
                 );
 
                 // Audio routing:
@@ -951,21 +952,20 @@
                 state.processorNode.onaudioprocess = (event) => {
                     if (!state.isRecording) return;
 
-                    // Get input samples from all channels
-                    if (preset.channels === 1) {
-                        // Mono: single channel
-                        const inputData = event.inputBuffer.getChannelData(0);
-                        state.wavEncoder.addSamples(inputData);
-                    } else if (preset.channels === 2) {
-                        // Stereo: interleave left and right channels
-                        const leftData = event.inputBuffer.getChannelData(0);
-                        const rightData = event.inputBuffer.getChannelData(1);
+                    // Get mono input from microphone
+                    const monoData = event.inputBuffer.getChannelData(0);
 
+                    if (preset.channels === 1) {
+                        // Mono preset: use mono input directly
+                        state.wavEncoder.addSamples(monoData);
+                    } else if (preset.channels === 2) {
+                        // Stereo preset: duplicate mono to both channels
                         // Create interleaved array [L, R, L, R, L, R, ...]
-                        const interleavedData = new Float32Array(leftData.length * 2);
-                        for (let i = 0; i < leftData.length; i++) {
-                            interleavedData[i * 2] = leftData[i];      // Left
-                            interleavedData[i * 2 + 1] = rightData[i]; // Right
+                        // For stereo from mono, Left and Right are identical
+                        const interleavedData = new Float32Array(monoData.length * 2);
+                        for (let i = 0; i < monoData.length; i++) {
+                            interleavedData[i * 2] = monoData[i];      // Left (from mono)
+                            interleavedData[i * 2 + 1] = monoData[i];  // Right (duplicate of mono)
                         }
 
                         state.wavEncoder.addSamples(interleavedData);
