@@ -200,21 +200,35 @@ Button shows actual format:
 
 ### What We Need for Phase 2
 
-**Decision Required**: What bit depth is acceptable?
+**Decision Required**: How important is 24-bit recording?
 
-**Option A: Accept 16-bit** (Recommended based on Phase 1.5)
+**Option A: Accept 16-bit** (Simple, Quick)
 - ✅ RecordRTC works perfectly for 16-bit PCM WAV
-- ✅ Simpler implementation
+- ✅ Minimal implementation
 - ✅ Works across all browsers
-- ⚠️ Would need to update Character Recordings preset to 16-bit instead of 24-bit
+- ⚠️ Would need to update Character Recordings preset to 16-bit
+- **Timeline**: 1-2 days to integrate into Phase 2
 
-**Option B: Find 24-bit solution** (If 24-bit is critical)
-- 🔍 Investigate alternative recording libraries
-- 🔍 Consider native Web Audio API + offline processing (complex)
-- 🔍 Check if other JavaScript audio libraries support 24-bit
-- ⚠️ May require more complex implementation
+**Option B: Implement Custom 24-bit Encoder** ⭐ RECOMMENDED IF 24-BIT REQUIRED
+- ✅ Custom Web Audio API implementation
+- ✅ Guaranteed 24-bit PCM WAV output
+- ✅ Complete control over encoding
+- ✅ Works across all browsers
+- ⚠️ Requires implementing WAV encoder (100-200 lines)
+- **Timeline**: 2-3 days for implementation + testing
+- **Complexity**: Moderate (manageable)
 
-**Current Recommendation**: Accept 16-bit, update presets to match RecordRTC capabilities
+**Option C: Backend Processing** (Complex, Requires Infrastructure)
+- Browser sends raw PCM to backend
+- Server encodes as 24-bit WAV
+- **Cons**: Network latency, server dependency, more infrastructure
+- **Timeline**: 4-5 days
+- **Complexity**: High
+
+**Current Recommendation**:
+- **If 24-bit is critical**: Go with Option B (Custom Web Audio API encoder)
+- **If 16-bit is acceptable**: Go with Option A (RecordRTC, keep it simple)
+- **Recommendation**: Option B gives best balance of control and quality
 
 ---
 
@@ -285,31 +299,46 @@ state.recorder = new RecordRTC(stream, {
 });
 ```
 
-### IMPORTANT DISCOVERY: RecordRTC Bit Depth Limitation
+### CRITICAL DISCOVERY: 24-bit WAV Recording in Browsers
 
-**Critical Finding**: RecordRTC appears to only support **16-bit recording**, not 24-bit.
+**Finding**: Browser-based 24-bit PCM WAV recording is **NOT readily available** in existing libraries.
 
-Even when configured with:
-```javascript
-bitsPerSample: 24
-```
+**Investigation Results:**
+- ❌ **RecordRTC**: Only supports 16-bit
+- ❌ **MediaRecorder**: Browser-dependent, format varies
+- ❌ **WebAudioRecorder.js**: Doesn't natively support 24-bit
+- ❌ **No "ready-made" solution exists**
 
-The resulting WAV file contains:
-```
-Bit Depth: 16-bit (actual in file)
-```
+**Available Approaches for 24-bit:**
 
-**Implications for Phase 2:**
-1. ⚠️ If 24-bit is a hard requirement, RecordRTC won't work
-2. ✅ If 16-bit is acceptable, RecordRTC works great
-3. 🔍 Need to investigate alternative libraries if 24-bit is required
-4. 📋 May need to update project requirements to accept 16-bit recording
+1. **Custom Web Audio API Implementation** ⭐ RECOMMENDED
+   - Use Web Audio API to capture Float32 samples
+   - Manually encode to 24-bit PCM (3 bytes per sample)
+   - Build WAV headers and file structure manually
+   - **Pros**: Complete control, guaranteed 24-bit, works everywhere
+   - **Cons**: More code, need to implement encoding logic
+   - **Complexity**: Moderate (100-200 lines of code)
+
+2. **Backend Processing Approach**
+   - Browser captures raw PCM data from Web Audio API
+   - Send to backend server
+   - Server finalizes as 24-bit WAV file
+   - **Pros**: Simpler browser code
+   - **Cons**: Requires backend infrastructure, network latency
+   - **Complexity**: High (needs server component)
+
+3. **Modify WebAudioRecorder.js**
+   - Fork and customize encoder libraries
+   - Implement 24-bit encoding in custom encoder
+   - **Pros**: Leverages existing library
+   - **Cons**: Requires forking/maintaining custom code
+   - **Complexity**: High (library internals)
 
 **Current Status:**
-- ✅ 16-bit PCM WAV recording works reliably
+- ✅ 16-bit PCM WAV recording works (RecordRTC)
 - ✅ Sample rates respected (48kHz, 44.1kHz)
 - ✅ Channels respected (Mono, Stereo)
-- ❌ 24-bit recording appears unsupported by RecordRTC
+- ⚠️ 24-bit requires custom implementation
 
 ### Success Metrics for Phase 2
 - ✅ All recordings are true PCM WAV
@@ -319,6 +348,73 @@ Bit Depth: 16-bit (actual in file)
 - ✅ WAV header validation passes
 - ✅ Works on Chrome, Firefox, Safari, Edge
 - ✅ Files compatible with all audio tools
+
+---
+
+## Phase 1.5 Extension: Custom 24-bit WAV Encoder
+
+If 24-bit recording is required, we can implement a custom encoder in the POC using the Web Audio API approach:
+
+### Implementation Strategy
+
+```javascript
+// Capture Float32 samples from Web Audio API
+// For each sample:
+//   1. Convert Float32 (-1.0 to 1.0) to 24-bit integer (-8388608 to 8388607)
+//   2. Pack 3 bytes per sample (24-bit = 3 bytes)
+//   3. Build WAV header with correct specifications
+//   4. Create Blob and download
+
+// Pseudo-code:
+class WAV24Encoder {
+    constructor(sampleRate, channels, bitDepth = 24) {
+        this.sampleRate = sampleRate;
+        this.channels = channels;
+        this.bitDepth = bitDepth;
+        this.samples = [];
+    }
+
+    addSamples(float32Array) {
+        // Convert Float32 to 24-bit PCM
+        for (let i = 0; i < float32Array.length; i++) {
+            let s = Math.max(-1, Math.min(1, float32Array[i]));
+            s = s < 0 ? s * 0x800000 : s * 0x7FFFFF;
+            // Store as 3 bytes (24-bit)
+            this.samples.push(s & 0xFF);
+            this.samples.push((s >> 8) & 0xFF);
+            this.samples.push((s >> 16) & 0xFF);
+        }
+    }
+
+    finish() {
+        // Build WAV file with proper headers
+        // Write RIFF chunk
+        // Write fmt chunk (with bitDepth = 24)
+        // Write data chunk with samples
+        // Return Blob
+    }
+}
+```
+
+### Estimated Effort
+- **Implementation**: 150-200 lines of JavaScript
+- **Testing**: 2-4 hours
+- **Integration into Phase 2**: 1-2 days
+
+### Pros
+- ✅ Guaranteed 24-bit output
+- ✅ No external dependencies (pure Web Audio API)
+- ✅ Full control over WAV encoding
+- ✅ Works on all modern browsers
+
+### Cons
+- ⚠️ More complex than using RecordRTC
+- ⚠️ Need to handle edge cases (sample rate conversion, mono vs stereo)
+- ⚠️ Performance testing needed
+
+### Decision
+- **If you need 24-bit**: Worth implementing (manageable complexity)
+- **If 16-bit works**: Stick with RecordRTC (simpler, proven)
 
 ---
 
