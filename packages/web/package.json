@@ -7,13 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:beta": "vite build --mode beta",
     "preview": "vite preview",
     "serve": "serve dist",
-    "deploy": "npm run build && echo audio-analyzer.tinytech.site > dist/CNAME && gh-pages -d dist --add",
-    "deploy:beta": "npm run build:beta && gh-pages -d dist -e beta --add",
-    "deploy:clean": "npm run build && echo audio-analyzer.tinytech.site > dist/CNAME && gh-pages -d dist",
-    "deploy:beta:clean": "npm run build:beta && gh-pages -d dist -e beta",
     "prebuild": "npm --workspace=@audio-analyzer/core run build",
     "test": "vitest",
     "test:ui": "vitest --ui",

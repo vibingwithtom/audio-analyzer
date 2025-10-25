@@ -1,4 +1,7 @@
-name: Deploy to Production
+name: CI - Main Branch
+
+# NOTE: Deployment now handled by Cloudflare Pages
+# This workflow only runs tests to ensure code quality before Cloudflare deploys
 
 on:
   push:
@@ -6,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Run Tests First
+    name: Run Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -34,46 +37,3 @@ jobs:
       - name: TypeScript type checking
         working-directory: ./packages/web
         run: npm run typecheck
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: test  # Only deploy if tests pass
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: |
-          # Workaround for npm ci platform-specific dependency issues
-          # See: https://github.com/npm/cli/issues/4828
-          # Remove lockfile and use npm install to handle optional deps correctly
-          rm -f package-lock.json
-          npm install --no-audit
-
-      - name: Build
-        working-directory: ./packages/web
-        run: npm run build
-
-      - name: Add CNAME
-        working-directory: ./packages/web
-        run: echo audio-analyzer.tinytech.site > dist/CNAME
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./packages/web/dist
-          force_orphan: false  # Preserve history
-          keep_files: true     # Preserve /beta directory and other files

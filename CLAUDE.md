@@ -149,18 +149,26 @@ npm run lint             # Lint all workspaces
 
 ### Web Deployment
 
-**Production (Automatic):**
-- Deploys automatically when code is pushed to `main` branch
-- GitHub Actions runs tests first, blocks deployment if tests fail
+**All deployments now handled by Cloudflare Pages (automatic):**
+
+**Production:**
+- Branch: `main`
 - URL: https://audio-analyzer.tinytech.site
+- Triggers: Automatic on push to main
+- Tests: GitHub Actions CI runs first (blocking)
 
-**Beta (Manual):**
-```bash
-cd packages/web
-npm run deploy:beta      # Deploys to https://audio-analyzer.tinytech.site/beta/
-```
+**Beta:**
+- Branch: `staging`
+- URL: https://beta.audio-analyzer.tinytech.site
+- Triggers: Automatic on push to staging
+- Tests: GitHub Actions CI runs first (blocking)
 
-**Note:** See `packages/web/DEPLOYMENT.md` for detailed deployment guide.
+**Preview (Feature Branches):**
+- Any branch: Automatic preview deployment
+- URL: `https://<commit-id>.audio-analyzer.pages.dev`
+- Useful for testing PRs before merging
+
+**Note:** GitHub Pages is no longer used. GitHub Actions only runs tests/CI. See `docs/CLOUDFLARE_MIGRATION.md` for details.
 
 ## Architecture
 
