@@ -3,6 +3,7 @@
  *
  * Detects whether the app is running in:
  * - Development (localhost)
+ * - Preview (Cloudflare Pages feature branch deployments)
  * - Beta (beta subdomain: beta.audio-analyzer.tinytech.site)
  * - Production (main site: audio-analyzer.tinytech.site)
  */
@@ -20,8 +21,18 @@ export class EnvironmentDetector {
       return 'development';
     }
 
-    // Beta - subdomain (beta.audio-analyzer.tinytech.site)
-    if (this.hostname.startsWith('beta.')) {
+    // Preview - Cloudflare Pages feature branch deployments
+    // Pattern: <commit-id>.audio-analyzer.pages.dev (but not audio-analyzer.pages.dev or staging.audio-analyzer.pages.dev)
+    if (this.hostname.endsWith('.audio-analyzer.pages.dev')) {
+      const subdomain = this.hostname.replace('.audio-analyzer.pages.dev', '');
+      // If subdomain is not empty and not 'staging', it's a preview
+      if (subdomain && subdomain !== 'staging') {
+        return 'preview';
+      }
+    }
+
+    // Beta - subdomain (beta.audio-analyzer.tinytech.site or staging.audio-analyzer.pages.dev)
+    if (this.hostname.startsWith('beta.') || this.hostname === 'staging.audio-analyzer.pages.dev') {
       return 'beta';
     }
 
@@ -42,6 +53,10 @@ export class EnvironmentDetector {
     return this.environment === 'development';
   }
 
+  isPreview() {
+    return this.environment === 'preview';
+  }
+
   isBeta() {
     return this.environment === 'beta';
   }
@@ -55,6 +70,12 @@ export class EnvironmentDetector {
       development: {
         name: 'Development',
         message: 'Development Environment',
+        productionUrl: 'https://audio-analyzer.tinytech.site',
+        showBanner: true
+      },
+      preview: {
+        name: 'Preview',
+        message: 'Preview Environment - Feature Branch',
         productionUrl: 'https://audio-analyzer.tinytech.site',
         showBanner: true
       },

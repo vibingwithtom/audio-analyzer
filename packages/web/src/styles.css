@@ -1366,6 +1366,13 @@ a.box-link {
   color: #581C87;
 }
 
+/* Preview environment (blue) - Cloudflare Pages feature branch */
+.environment-banner[data-environment="preview"] {
+  background-color: #DBEAFE;
+  border-color: #2563EB;
+  color: #1E3A8A;
+}
+
 /* Beta environment (orange) */
 .environment-banner[data-environment="beta"] {
   background-color: #FEF3C7;

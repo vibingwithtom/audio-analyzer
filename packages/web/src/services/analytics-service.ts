@@ -9,12 +9,13 @@ declare global {
 
 /**
  * Detect environment based on URL
- * - beta.* subdomain = beta environment
- * - /beta/ path = beta environment (legacy)
  * - localhost/127.0.0.1 = development environment
+ * - *.audio-analyzer.pages.dev (not audio-analyzer or staging) = preview environment
+ * - beta.* subdomain or staging.audio-analyzer.pages.dev = beta environment
+ * - /beta/ path = beta environment (legacy)
  * - everything else = production environment
  */
-function getEnvironment(): 'development' | 'beta' | 'production' {
+function getEnvironment(): 'development' | 'preview' | 'beta' | 'production' {
   if (typeof window === 'undefined' || !window.location) {
     return 'production';
   }
@@ -27,8 +28,16 @@ function getEnvironment(): 'development' | 'beta' | 'production' {
     return 'development';
   }
 
-  // Beta (subdomain)
-  if (hostname.startsWith('beta.')) {
+  // Preview - Cloudflare Pages feature branch deployments
+  if (hostname.endsWith('.audio-analyzer.pages.dev')) {
+    const subdomain = hostname.replace('.audio-analyzer.pages.dev', '');
+    if (subdomain && subdomain !== 'staging') {
+      return 'preview';
+    }
+  }
+
+  // Beta (subdomain or staging Pages URL)
+  if (hostname.startsWith('beta.') || hostname === 'staging.audio-analyzer.pages.dev') {
     return 'beta';
   }
 
