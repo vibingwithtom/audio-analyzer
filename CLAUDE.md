@@ -162,7 +162,7 @@ npm run deploy:beta      # Deploys to https://audio-analyzer.tinytech.site/beta/
 
 **Note:** See `packages/web/DEPLOYMENT.md` for detailed deployment guide.
 
-### Cloudflare Pages Debugging
+### Using the Cloudflare CLI Tool
 
 **Environment variables required:**
 ```bash
@@ -183,7 +183,7 @@ python3 .claude/mcp/cloudflare_fetch_logs.py audio-analyzer <deployment-id> deta
 python3 .claude/mcp/cloudflare_fetch_logs.py audio-analyzer <deployment-id> concise
 ```
 
-**Use this to debug build failures** - the tool fetches logs directly from Cloudflare API for the audio-analyzer Pages project.
+Use this to debug build failures - the tool fetches logs directly from Cloudflare API for the audio-analyzer Pages project. No dependencies required.
 
 ## Architecture
 
@@ -212,26 +212,6 @@ Vanilla JS SPA built with Vite. Key files:
   - Three Hour: `[scriptName]_[speakerID].wav`
   - Bilingual: `[ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]`
 - **Batch Processing**: Google Drive folders, Box folders, local multi-file selection
-
-## Cloudflare API Tools
-
-**Note:** Cloudflare offers official MCP servers (Workers, Observability, Radar, etc.) but does not provide one for Pages deployments, so we have a custom solution.
-
-### Pages Deployment Tools
-
-The following tools are available in `.claude/mcp/`:
-- `cloudflare_mcp.py` - Full MCP server (requires MCP SDK, pending setup)
-- `cloudflare_fetch_logs.py` - CLI tool for debugging Pages builds (recommended, no dependencies)
-
-Both tools support:
-- Listing recent deployments
-- Fetching deployment logs and status
-- Retrieving project information
-- Retrying failed builds
-
-**Use the CLI tool** (see "Cloudflare Pages Debugging" section below) as it requires no additional setup.
-
----
 
 ## Svelte MCP Integration
 
