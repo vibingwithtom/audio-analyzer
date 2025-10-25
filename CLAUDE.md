@@ -213,6 +213,22 @@ Vanilla JS SPA built with Vite. Key files:
   - Bilingual: `[ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]`
 - **Batch Processing**: Google Drive folders, Box folders, local multi-file selection
 
+## Cloudflare API MCP Server
+
+**Status:** Configured in `.mcp.json` but requires MCP SDK installation.
+
+The Cloudflare Pages MCP server is defined in `.claude/mcp/cloudflare_mcp.py` with tools for:
+- `get_deployment_logs()` - Fetch build logs for a deployment
+- `list_deployments()` - List recent deployments
+- `get_deployment_details()` - Get deployment info
+- `retry_deployment()` - Retry a failed build
+- `list_projects()` - List all Pages projects
+- `get_project_info()` - Get project details
+
+**Current approach:** Use the CLI tool instead (see "Cloudflare Pages Debugging" section below) as it requires no additional dependencies.
+
+---
+
 ## Svelte MCP Integration
 
 **The Svelte MCP server is available to help with Svelte development.**
