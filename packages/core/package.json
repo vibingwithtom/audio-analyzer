@@ -3,14 +3,26 @@
   "version": "1.0.0",
   "description": "Shared audio analysis engine for Chrome extension and desktop app",
   "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["dist", "index.js", "index.d.ts", "*.js"],
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
   "scripts": {
-    "build": "echo 'Core build completed'",
-    "dev": "echo 'Core in dev mode'",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist index.d.ts",
     "lint": "echo 'Core linting'",
     "test": "echo 'Core tests'"
   },
   "keywords": ["audio", "analysis", "wav", "mp3", "flac"],
   "author": "vibingwithtom",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

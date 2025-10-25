@@ -1,6 +1,6 @@
 <script lang="ts">
   import StatusBadge from './StatusBadge.svelte';
-  import { formatSampleRate, formatDuration, formatBitDepth, formatChannels, formatBytes } from '../utils/format-utils';
+  import { formatSampleRate, formatDuration, formatBitDepth, formatChannels, formatBytes, computeExperimentalStatus, getNormalizationStatus, getReverbStatus, getNoiseFloorStatus, getSilenceStatus, getClippingStatus, getMicBleedStatus } from '@audio-analyzer/core';
   import {
     formatValidationMessage,
     splitValidationErrors,
@@ -12,15 +12,6 @@
   import type { AudioResults, ValidationResults } from '../types';
   import { selectedPreset } from '../stores/settings';
   import { CriteriaValidator } from '@audio-analyzer/core';
-  import {
-    computeExperimentalStatus,
-    getNormalizationStatus,
-    getReverbStatus,
-    getNoiseFloorStatus,
-    getSilenceStatus,
-    getClippingStatus,
-    getMicBleedStatus
-  } from '../utils/status-utils';
 
   import { SvelteSet } from 'svelte/reactivity';
 

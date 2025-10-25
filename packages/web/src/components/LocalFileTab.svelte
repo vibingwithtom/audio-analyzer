@@ -9,8 +9,7 @@
   import { isSimplifiedMode } from '../stores/simplifiedMode';
   import type { AudioResults, ValidationResults } from '../types';
   import { analyticsService } from '../services/analytics-service';
-  import { AnalysisCancelledError } from '@audio-analyzer/core';
-  import { FilenameValidator } from '../validation/filename-validator';
+  import { AnalysisCancelledError, FilenameValidator } from '@audio-analyzer/core';
 
   let analysisProgress = $state({
     visible: false,

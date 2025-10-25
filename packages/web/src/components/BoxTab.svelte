@@ -10,9 +10,8 @@
   import { BoxAPI } from '../services/box-api';
   import type { AudioResults, ValidationResults } from '../types';
   import { analyticsService } from '../services/analytics-service';
-  import { AnalysisCancelledError } from '@audio-analyzer/core';
+  import { AnalysisCancelledError, FilenameValidator } from '@audio-analyzer/core';
   import { cancelCurrentAnalysis } from '../services/audio-analysis-service';
-  import { FilenameValidator } from '../validation/filename-validator';
 
   let analysisProgress = $state({
     visible: false,
