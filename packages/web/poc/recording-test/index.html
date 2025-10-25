@@ -898,16 +898,31 @@
                 const preset = PRESETS[state.currentPreset];
 
                 // Request microphone access with preset constraints
-                state.stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        sampleRate: { exact: preset.sampleRate },
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false
-                    }
-                });
-
-                log(`Microphone stream acquired at ${preset.sampleRate}Hz`);
+                // Try exact sample rate first, fall back to any available
+                try {
+                    state.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: { exact: preset.sampleRate },
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
+                    log(`Microphone stream acquired at exactly ${preset.sampleRate}Hz`);
+                } catch (constraintError) {
+                    log(`Exact sample rate ${preset.sampleRate}Hz not supported, trying ideal...`);
+                    // Fall back to ideal (hint, not requirement)
+                    state.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: { ideal: preset.sampleRate },
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
+                    const actualSampleRate = state.stream.getAudioTracks()[0].getSettings()?.sampleRate || preset.sampleRate;
+                    log(`Microphone stream acquired at ${actualSampleRate}Hz (requested ${preset.sampleRate}Hz)`);
+                }
 
                 // Create audio context for analysis and capture
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
