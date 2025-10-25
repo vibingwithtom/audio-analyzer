@@ -908,7 +908,6 @@
                             autoGainControl: false
                         }
                     });
-                    log(`Microphone stream acquired at exactly ${preset.sampleRate}Hz`);
                 } catch (constraintError) {
                     log(`Exact sample rate ${preset.sampleRate}Hz not supported, trying ideal...`);
                     // Fall back to ideal (hint, not requirement)
@@ -924,7 +923,11 @@
 
                 // Get the ACTUAL sample rate the microphone provided
                 const actualSampleRate = state.stream.getAudioTracks()[0].getSettings()?.sampleRate || preset.sampleRate;
-                log(`Microphone stream acquired at ${actualSampleRate}Hz (requested ${preset.sampleRate}Hz)`);
+                if (actualSampleRate === preset.sampleRate) {
+                    log(`Microphone stream acquired at ${actualSampleRate}Hz`);
+                } else {
+                    log(`Microphone stream acquired at ${actualSampleRate}Hz (requested ${preset.sampleRate}Hz, not available)`);
+                }
 
                 // Create audio context for analysis and capture
                 // CRITICAL: Use actual microphone sample rate, not preset rate
@@ -1117,8 +1120,8 @@
         function parseWAVHeader(arrayBuffer) {
             const view = new DataView(arrayBuffer);
 
-            // Check for RIFF header
-            if (view.getUint32(0, false) !== 0x46464952) { // "RIFF"
+            // Check for RIFF header (little-endian, matching WAV format standard)
+            if (view.getUint32(0, true) !== 0x46464952) { // "RIFF"
                 throw new Error('Not a valid WAV file - missing RIFF header');
             }
 
