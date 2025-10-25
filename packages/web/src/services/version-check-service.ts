@@ -16,11 +16,12 @@ export class VersionCheckService {
    * Get the base path for the current deployment (handles beta vs production)
    */
   private getBasePath(): string {
-    // Check if we're in beta deployment
+    // Legacy: Check if we're in old /beta/ path deployment
     const path = window.location.pathname;
     if (path.startsWith('/beta/')) {
       return '/beta';
     }
+    // Current: Subdomain-based deployments (beta.* vs production) all use root path
     return '';
   }
 

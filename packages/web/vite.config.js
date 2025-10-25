@@ -24,7 +24,9 @@ export default defineConfig(({ mode }) => ({
   plugins: [svelte(), versionPlugin()],
   root: '.',
   publicDir: 'public',
-  base: mode === 'beta' ? '/beta/' : '/',
+  // Base path is always '/' since beta uses subdomain (beta.audio-analyzer.tinytech.site)
+  // Legacy '/beta/' path no longer used
+  base: '/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

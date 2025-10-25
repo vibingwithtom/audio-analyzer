@@ -8,10 +8,11 @@ declare global {
 }
 
 /**
- * Detect environment based on URL path
- * - /beta/ path = beta environment
- * - / path = production environment
+ * Detect environment based on URL
+ * - beta.* subdomain = beta environment
+ * - /beta/ path = beta environment (legacy)
  * - localhost/127.0.0.1 = development environment
+ * - everything else = production environment
  */
 function getEnvironment(): 'development' | 'beta' | 'production' {
   if (typeof window === 'undefined' || !window.location) {
@@ -26,7 +27,12 @@ function getEnvironment(): 'development' | 'beta' | 'production' {
     return 'development';
   }
 
-  // Beta (deployed to /beta/ path)
+  // Beta (subdomain)
+  if (hostname.startsWith('beta.')) {
+    return 'beta';
+  }
+
+  // Beta (legacy /beta/ path for backward compatibility)
   if (pathname.startsWith('/beta/')) {
     return 'beta';
   }

@@ -3,8 +3,8 @@
  *
  * Detects whether the app is running in:
  * - Development (localhost)
- * - Beta (beta subdirectory)
- * - Production (main site)
+ * - Beta (beta subdomain: beta.audio-analyzer.tinytech.site)
+ * - Production (main site: audio-analyzer.tinytech.site)
  */
 
 export class EnvironmentDetector {
@@ -20,7 +20,12 @@ export class EnvironmentDetector {
       return 'development';
     }
 
-    // Beta - /beta/ path
+    // Beta - subdomain (beta.audio-analyzer.tinytech.site)
+    if (this.hostname.startsWith('beta.')) {
+      return 'beta';
+    }
+
+    // Legacy beta - /beta/ path (for backward compatibility)
     if (this.pathname && (this.pathname.startsWith('/beta/') || this.pathname === '/beta')) {
       return 'beta';
     }
