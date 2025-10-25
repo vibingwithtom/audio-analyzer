@@ -24,8 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@audio-analyzer/core": "^1.0.0",
-    "recordrtc": "^5.6.2"
+    "@audio-analyzer/core": "^1.0.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.0.0",
