@@ -11,6 +11,7 @@ export { GoogleDriveHandler } from './google-drive.js';
 export { StreamingAudioAnalyzer, BatchProcessor } from './batch-processor.js';
 
 // NEW exports from TypeScript modules (after build)
+// These are available when dist/ is built by: npm run build
 export * from './dist/index.js';
 
 // Convenience class that combines all functionality

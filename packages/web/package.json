@@ -14,9 +14,12 @@
     "deploy:beta": "npm run build:beta && gh-pages -d dist -e beta --add",
     "deploy:clean": "npm run build && echo audio-analyzer.tinytech.site > dist/CNAME && gh-pages -d dist",
     "deploy:beta:clean": "npm run build:beta && gh-pages -d dist -e beta",
+    "prebuild": "npm --workspace=@audio-analyzer/core run build",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "pretest": "npm --workspace=@audio-analyzer/core run build",
+    "pretest:run": "npm --workspace=@audio-analyzer/core run build",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
   },
