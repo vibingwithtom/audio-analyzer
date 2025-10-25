@@ -305,25 +305,38 @@ File Size: ~10.6 MB per minute
 
 ### Architecture Decision: MediaRecorder vs RecordRTC
 
-**We're using MediaRecorder** (native browser API):
+**We're using MediaRecorder** (native browser API) with intelligent fallback:
+
+**Approach**:
+1. ✅ Try WAV format first (`audio/wav`)
+2. ✅ Fall back to WebM, OGG, or MP4 if WAV unsupported
+3. ✅ Handle decode errors gracefully
+4. ✅ Show user what format was recorded
+5. ⏳ Can upgrade to RecordRTC if needed
 
 **Pros**:
 - ✅ Built-in to all modern browsers
-- ✅ Direct WAV output support
+- ✅ Format detection handles variations
 - ✅ No external library required
 - ✅ Better performance (optimized by browser vendor)
 - ✅ More maintainable (fewer dependencies)
 
 **Cons**:
-- Browser variations in WAV output
-- May need format fallback for some browsers
+- Audio format varies by browser (handled with fallback)
+- May record in WebM/OGG instead of WAV
 - Less control over encoding parameters
 
-**RecordRTC fallback**:
-If MediaRecorder WAV output proves unreliable:
-- Can integrate RecordRTC as backup
-- Use for browsers that don't support WAV directly
+**Phase 1.5 Finding**:
+- ❌ WAV not universally supported via MediaRecorder
+- ✅ Format detection and fallback solves this
+- ✅ Users still get working recordings
+- ⏳ Bit depth/sample rate still validated via presets
+
+**RecordRTC option**:
 - Installed: `npm install recordrtc`
+- Can integrate if MediaRecorder proves insufficient
+- Provides more control over encoding
+- Consider for Phase 2 if format consistency required
 
 ### Real-time Analysis Strategy
 
@@ -421,21 +434,28 @@ If MediaRecorder WAV output proves unreliable:
 
 ## Findings Summary
 
-### Audio Recording Approach
-- **Validated**: MediaRecorder API provides direct WAV support
-- **Finding**: [Awaiting test results]
+### Audio Recording Approach ✅
+- **Finding**: MediaRecorder API does NOT universally support WAV format
+- **Issue**: `audio/wav` MIME type fails on some browsers
+- **Solution**: Implement format detection fallback:
+  1. Check for WAV support first
+  2. Fall back to WebM, OGG, or other supported formats
+  3. Gracefully handle decode errors
+  4. Use appropriate file extensions
+- **Status**: ✅ Fixed in POC code with fallback handling
 
 ### Real-time Analysis
 - **Validated**: Web Audio API AnalyserNode provides sub-50ms latency
-- **Finding**: [Awaiting test results]
+- **Finding**: [Awaiting test results with updated POC]
 
 ### Browser Compatibility
-- **Validated**: Modern browsers (Chrome 90+, Firefox 88+, Safari 14.1+) support all required APIs
-- **Finding**: [Awaiting test results]
+- **Validated**: Modern browsers support getUserMedia and Web Audio API
+- **Finding**: Audio format support varies (see recording approach above)
+- **Recommendation**: Implement format detection as done in POC
 
 ### Performance Impact
 - **Target**: < 5% CPU cost for real-time analysis
-- **Finding**: [Awaiting test results]
+- **Finding**: [Awaiting test results with updated POC]
 
 ---
 
