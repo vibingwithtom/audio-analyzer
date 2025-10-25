@@ -920,14 +920,17 @@
                             autoGainControl: false
                         }
                     });
-                    const actualSampleRate = state.stream.getAudioTracks()[0].getSettings()?.sampleRate || preset.sampleRate;
-                    log(`Microphone stream acquired at ${actualSampleRate}Hz (requested ${preset.sampleRate}Hz)`);
                 }
 
+                // Get the ACTUAL sample rate the microphone provided
+                const actualSampleRate = state.stream.getAudioTracks()[0].getSettings()?.sampleRate || preset.sampleRate;
+                log(`Microphone stream acquired at ${actualSampleRate}Hz (requested ${preset.sampleRate}Hz)`);
+
                 // Create audio context for analysis and capture
+                // CRITICAL: Use actual microphone sample rate, not preset rate
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 state.audioContext = new AudioContext({
-                    sampleRate: preset.sampleRate
+                    sampleRate: actualSampleRate
                 });
 
                 // Create analyser for real-time metrics
@@ -938,12 +941,13 @@
                 state.sourceNode = state.audioContext.createMediaStreamSource(state.stream);
 
                 // Create WAV encoder
+                // Use actual sample rate (what microphone provided), not preset rate
                 state.wavEncoder = new WAV24Encoder(
-                    preset.sampleRate,
+                    actualSampleRate,
                     preset.channels,
                     preset.bitDepth
                 );
-                log(`WAV24Encoder created: ${preset.sampleRate}Hz, ${preset.channels} channels, ${preset.bitDepth}-bit`);
+                log(`WAV24Encoder created: ${actualSampleRate}Hz, ${preset.channels} channels, ${preset.bitDepth}-bit`);
 
                 // Create ScriptProcessorNode to capture samples
                 // Note: Microphones always provide mono (1 channel) input
