@@ -321,7 +321,13 @@ state.recorder = new RecordRTC(stream, {
 
 **Recommended Solution: opus-recorder**
 
-Library: [chris-rudmin/opus-recorder](https://github.com/chris-rudmin/opus-recorder) or [zhukov/opus-recorder](https://github.com/zhukov/opus-recorder)
+Library: [chris-rudmin/opus-recorder](https://github.com/chris-rudmin/opus-recorder) or [zhukov/opus-recorder](https://github.com/zhukov/opus-recorder) (fork)
+
+**License**: ✅ Permissive Open Source
+- **MIT License** - Main library (original work by Matt Diamond, modified by Christopher Rudmin)
+- **BSD License** - Opus audio codec
+- **BSD License** - Speex codec
+- All licenses allow modification and redistribution with proper attribution
 
 Key Features:
 - ✅ **Direct 24-bit WAV support** via `wavBitDepth: 24` configuration
@@ -329,7 +335,8 @@ Key Features:
 - ✅ **Flexible bit depths** - Supports 8, 16, 24, and 32-bit per sample
 - ✅ **Multiple formats** - Opus and WAV encoding
 - ✅ **Cross-browser compatible** - Works on Chrome, Firefox, Safari, Edge
-- ⚠️ **Status**: "No longer actively supported" but still fully functional
+- ✅ **Open source licenses** - MIT + BSD (permissive, commercial-friendly)
+- ⚠️ **Status**: "No longer actively supported" but fully functional
 
 Configuration:
 ```javascript
