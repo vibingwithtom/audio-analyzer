@@ -49,8 +49,5 @@
     "progressive-web-app"
   ],
   "author": "vibingwithtom",
-  "license": "MIT",
-  "optionalDependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.52.5"
-  }
+  "license": "MIT"
 }
