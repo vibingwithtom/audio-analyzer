@@ -931,8 +931,13 @@
                 log(`WAV24Encoder created: ${preset.sampleRate}Hz, ${preset.channels} channels, ${preset.bitDepth}-bit`);
 
                 // Create ScriptProcessorNode to capture samples
+                // Must match preset channels (1 for mono, 2 for stereo)
                 const bufferSize = 4096;
-                state.processorNode = state.audioContext.createScriptProcessor(bufferSize, 1, 1);
+                state.processorNode = state.audioContext.createScriptProcessor(
+                    bufferSize,
+                    preset.channels,  // Input channels from preset
+                    preset.channels   // Output channels from preset
+                );
 
                 // Audio routing:
                 // sourceNode -> analyser (for real-time metrics)
@@ -946,11 +951,25 @@
                 state.processorNode.onaudioprocess = (event) => {
                     if (!state.isRecording) return;
 
-                    // Get input samples
-                    const inputData = event.inputBuffer.getChannelData(0);
+                    // Get input samples from all channels
+                    if (preset.channels === 1) {
+                        // Mono: single channel
+                        const inputData = event.inputBuffer.getChannelData(0);
+                        state.wavEncoder.addSamples(inputData);
+                    } else if (preset.channels === 2) {
+                        // Stereo: interleave left and right channels
+                        const leftData = event.inputBuffer.getChannelData(0);
+                        const rightData = event.inputBuffer.getChannelData(1);
 
-                    // Add samples to encoder
-                    state.wavEncoder.addSamples(inputData);
+                        // Create interleaved array [L, R, L, R, L, R, ...]
+                        const interleavedData = new Float32Array(leftData.length * 2);
+                        for (let i = 0; i < leftData.length; i++) {
+                            interleavedData[i * 2] = leftData[i];      // Left
+                            interleavedData[i * 2 + 1] = rightData[i]; // Right
+                        }
+
+                        state.wavEncoder.addSamples(interleavedData);
+                    }
                 };
 
                 const initEnd = performance.now();
