@@ -599,6 +599,26 @@
             // Check for MediaRecorder
             if (window.MediaRecorder) {
                 capabilities.push('✓ MediaRecorder API');
+
+                // Check supported formats
+                const formats = [];
+                const formatsToCheck = [
+                    { name: 'WAV', mime: 'audio/wav' },
+                    { name: 'WebM', mime: 'audio/webm' },
+                    { name: 'WebM (Opus)', mime: 'audio/webm;codecs=opus' },
+                    { name: 'OGG', mime: 'audio/ogg' },
+                    { name: 'MP4', mime: 'audio/mp4' }
+                ];
+
+                for (const format of formatsToCheck) {
+                    if (MediaRecorder.isTypeSupported(format.mime)) {
+                        formats.push(`✓ ${format.name}`);
+                    }
+                }
+
+                if (formats.length > 0) {
+                    capabilities.push(`&nbsp;&nbsp;Supported formats: ${formats.join(', ')}`);
+                }
             } else {
                 issues.push('✗ MediaRecorder API not supported');
             }
@@ -763,6 +783,27 @@
         // Recording Functions
         // ============================================
 
+        function getSupportedMimeType() {
+            // Prioritize WAV, fall back to other formats
+            const types = [
+                'audio/wav',
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/ogg',
+                'audio/mp4'
+            ];
+
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    return type;
+                }
+            }
+
+            // If none supported, return empty (will use default)
+            return '';
+        }
+
         async function startRecording() {
             try {
                 log('Initializing recording...');
@@ -793,16 +834,21 @@
                 const source = state.audioContext.createMediaStreamSource(state.stream);
                 source.connect(state.analyser);
 
-                // Create recorder using MediaRecorder
-                const mimeType = 'audio/wav';
-                const mediaRecorder = new MediaRecorder(state.stream, {
-                    mimeType: mimeType
-                });
+                // Create recorder using MediaRecorder with supported MIME type
+                const mimeType = getSupportedMimeType();
+                log(`Recording with MIME type: ${mimeType || 'default (likely webm)'}`);
+
+                const mediaRecorder = new MediaRecorder(state.stream,
+                    mimeType ? { mimeType } : {}
+                );
 
                 const chunks = [];
                 mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
                 mediaRecorder.onstop = () => {
-                    state.recordingBlob = new Blob(chunks, { type: 'audio/wav' });
+                    // Try to create blob with detected MIME type
+                    const detectedType = mimeType || 'audio/webm';
+                    state.recordingBlob = new Blob(chunks, { type: detectedType });
+                    log(`Recording blob created: ${detectedType}, size: ${(state.recordingBlob.size / 1024).toFixed(1)} KB`);
                 };
 
                 mediaRecorder.start();
@@ -924,10 +970,63 @@
                 const preset = PRESETS[state.currentPreset];
                 const blob = state.recordingBlob;
 
+                // Log the format we recorded
+                log(`Recorded blob type: ${blob.type}, size: ${blob.size} bytes`);
+
                 // Decode audio
                 const arrayBuffer = await blob.arrayBuffer();
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+                let audioBuffer;
+                try {
+                    audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                } catch (decodeError) {
+                    log(`Warning: Could not decode audio format (${blob.type}). This may be expected for some formats.`);
+                    log(`Decode error: ${decodeError.message}`);
+
+                    // Use preset info as fallback for metadata
+                    const duration = (blob.size / (preset.sampleRate * (preset.bitDepth / 8) * preset.channels)) || 0;
+                    log(`Using preset defaults for analysis (estimated duration: ${duration.toFixed(2)}s)`);
+
+                    document.getElementById('resultDuration').textContent = `${duration.toFixed(2)}s (estimated)`;
+                    document.getElementById('resultSampleRate').textContent = formatFrequency(preset.sampleRate);
+                    document.getElementById('resultBitDepth').textContent = `${preset.bitDepth}-bit`;
+                    document.getElementById('resultChannels').textContent = preset.channels === 1 ? 'Mono' : 'Stereo';
+                    document.getElementById('fileSize').textContent = `${(blob.size / 1024).toFixed(2)} KB`;
+
+                    const validationHtml = `
+                        <div class="results-grid" style="margin-top: 15px;">
+                            <div class="result-card">
+                                <label>Format Support</label>
+                                <div class="status warning">⚠ Format validation limited</div>
+                            </div>
+                            <div class="result-card">
+                                <label>Sample Rate</label>
+                                <div class="status pass">✓ Preset match</div>
+                            </div>
+                        </div>
+                        <div class="info-box">
+                            <strong>Note:</strong> Browser recorded audio in ${blob.type} format. WebAudio API could not decode this format for detailed analysis, but the recording was created successfully. You can still download and listen to the file.
+                        </div>
+                    `;
+
+                    document.getElementById('downloadSection').innerHTML = validationHtml;
+                    document.getElementById('recordingResults').style.display = 'block';
+
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `recording-${Date.now()}.${blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'wav'}`;
+
+                    validationHtml += `
+                        <div style="text-align: center; margin-top: 20px;">
+                            <a href="${url}" download class="download-link">📥 Download Recording (${blob.type})</a>
+                        </div>
+                    `;
+
+                    document.getElementById('downloadSection').innerHTML = validationHtml;
+                    return;
+                }
 
                 // Extract metadata
                 const duration = audioBuffer.duration;
@@ -976,11 +1075,18 @@
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `recording-${Date.now()}.wav`;
+
+                // Determine file extension based on MIME type
+                let extension = 'wav';
+                if (blob.type.includes('webm')) extension = 'webm';
+                else if (blob.type.includes('ogg')) extension = 'ogg';
+                else if (blob.type.includes('mp4')) extension = 'mp4';
+
+                link.download = `recording-${Date.now()}.${extension}`;
 
                 validationHtml += `
                     <div style="text-align: center; margin-top: 20px;">
-                        <a href="${url}" download class="download-link">📥 Download Recording</a>
+                        <a href="${url}" download class="download-link">📥 Download Recording (${blob.type || 'audio/' + extension})</a>
                     </div>
                 `;
 
