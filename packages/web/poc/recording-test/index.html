@@ -1089,10 +1089,10 @@
             let sampleRate = 0, channels = 0, bitDepth = 0, duration = 0, audioFormat = 0;
 
             while (pos < arrayBuffer.byteLength) {
-                const chunkID = view.getUint32(pos, false);
+                const chunkID = view.getUint32(pos, true);  // Little-endian (WAV format standard)
                 const chunkSize = view.getUint32(pos + 4, true);
 
-                if (chunkID === 0x20746d66) { // "fmt " chunk
+                if (chunkID === 0x20746d66) { // "fmt " chunk (little-endian)
                     // Audio format (should be 1 for PCM)
                     audioFormat = view.getUint16(pos + 8, true);
                     channels = view.getUint16(pos + 10, true);
@@ -1100,7 +1100,7 @@
                     bitDepth = view.getUint16(pos + 22, true);
                 }
 
-                if (chunkID === 0x61746164) { // "data" chunk
+                if (chunkID === 0x61746164) { // "data" chunk (little-endian)
                     const dataSize = chunkSize;
                     duration = dataSize / (sampleRate * channels * (bitDepth / 8));
                 }
