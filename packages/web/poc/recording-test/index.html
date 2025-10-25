@@ -490,6 +490,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
     <script>
         // ============================================
         // Configuration & State Management
@@ -599,28 +600,15 @@
             // Check for MediaRecorder
             if (window.MediaRecorder) {
                 capabilities.push('✓ MediaRecorder API');
-
-                // Check supported formats
-                const formats = [];
-                const formatsToCheck = [
-                    { name: 'WAV', mime: 'audio/wav' },
-                    { name: 'WebM', mime: 'audio/webm' },
-                    { name: 'WebM (Opus)', mime: 'audio/webm;codecs=opus' },
-                    { name: 'OGG', mime: 'audio/ogg' },
-                    { name: 'MP4', mime: 'audio/mp4' }
-                ];
-
-                for (const format of formatsToCheck) {
-                    if (MediaRecorder.isTypeSupported(format.mime)) {
-                        formats.push(`✓ ${format.name}`);
-                    }
-                }
-
-                if (formats.length > 0) {
-                    capabilities.push(`&nbsp;&nbsp;Supported formats: ${formats.join(', ')}`);
-                }
             } else {
                 issues.push('✗ MediaRecorder API not supported');
+            }
+
+            // Check for RecordRTC
+            if (window.RecordRTC) {
+                capabilities.push('✓ RecordRTC (PCM WAV recording)');
+            } else {
+                issues.push('⚠ RecordRTC not loaded (will try to load from CDN)');
             }
 
             // Check for HTTPS
@@ -780,33 +768,12 @@
         }
 
         // ============================================
-        // Recording Functions
+        // Recording Functions (Using RecordRTC for PCM WAV)
         // ============================================
-
-        function getSupportedMimeType() {
-            // Prioritize WAV, fall back to other formats
-            const types = [
-                'audio/wav',
-                'audio/webm;codecs=opus',
-                'audio/webm',
-                'audio/ogg;codecs=opus',
-                'audio/ogg',
-                'audio/mp4'
-            ];
-
-            for (const type of types) {
-                if (MediaRecorder.isTypeSupported(type)) {
-                    return type;
-                }
-            }
-
-            // If none supported, return empty (will use default)
-            return '';
-        }
 
         async function startRecording() {
             try {
-                log('Initializing recording...');
+                log('Initializing recording with RecordRTC...');
                 const initStart = performance.now();
 
                 const preset = PRESETS[state.currentPreset];
@@ -821,7 +788,9 @@
                     }
                 });
 
-                // Create audio context
+                log(`Microphone stream acquired at ${preset.sampleRate}Hz`);
+
+                // Create audio context for analysis
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 state.audioContext = new AudioContext({
                     sampleRate: preset.sampleRate
@@ -834,25 +803,23 @@
                 const source = state.audioContext.createMediaStreamSource(state.stream);
                 source.connect(state.analyser);
 
-                // Create recorder using MediaRecorder with supported MIME type
-                const mimeType = getSupportedMimeType();
-                log(`Recording with MIME type: ${mimeType || 'default (likely webm)'}`);
+                // Create RecordRTC recorder for uncompressed PCM WAV
+                if (typeof RecordRTC === 'undefined') {
+                    throw new Error('RecordRTC library not loaded. Check CDN availability.');
+                }
 
-                const mediaRecorder = new MediaRecorder(state.stream,
-                    mimeType ? { mimeType } : {}
-                );
+                state.recorder = new RecordRTC(state.stream, {
+                    type: 'audio',
+                    mimeType: 'audio/wav',
+                    recorderType: RecordRTC.StereoAudioRecorder,
+                    desiredSampRate: preset.sampleRate,
+                    numberOfAudioChannels: preset.channels,
+                    bufferSize: 4096,
+                    bitsPerSample: preset.bitDepth
+                });
 
-                const chunks = [];
-                mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    // Try to create blob with detected MIME type
-                    const detectedType = mimeType || 'audio/webm';
-                    state.recordingBlob = new Blob(chunks, { type: detectedType });
-                    log(`Recording blob created: ${detectedType}, size: ${(state.recordingBlob.size / 1024).toFixed(1)} KB`);
-                };
-
-                mediaRecorder.start();
-                state.recorder = mediaRecorder;
+                state.recorder.startRecording();
+                log(`RecordRTC recorder started: ${preset.name} (${preset.sampleRate}Hz, ${preset.bitDepth}-bit, ${preset.channels} channels)`);
 
                 const initEnd = performance.now();
                 document.getElementById('initTime').textContent = `${(initEnd - initStart).toFixed(0)}ms`;
@@ -938,8 +905,13 @@
             log('Stopping recording...');
             state.isRecording = false;
 
-            if (state.recorder && state.recorder.state !== 'inactive') {
-                state.recorder.stop();
+            if (state.recorder) {
+                state.recorder.stopRecording(() => {
+                    // RecordRTC callback - blob is ready
+                    state.recordingBlob = state.recorder.getBlob();
+                    log(`Recording blob created: ${state.recordingBlob.type}, size: ${(state.recordingBlob.size / 1024 / 1024).toFixed(2)} MB`);
+                    analyzeRecording();
+                });
             }
 
             if (state.stream) {
@@ -950,13 +922,6 @@
                 state.audioContext.close();
             }
 
-            // Wait for blob to be assembled
-            setTimeout(() => {
-                if (state.recordingBlob) {
-                    analyzeRecording();
-                }
-            }, 100);
-
             document.getElementById('recordingStatus').style.display = 'none';
             document.getElementById('startRecordBtn').disabled = false;
             document.getElementById('stopRecordBtn').disabled = true;
@@ -964,96 +929,117 @@
             log('Recording stopped');
         }
 
+        // Parse WAV header to extract metadata
+        function parseWAVHeader(arrayBuffer) {
+            const view = new DataView(arrayBuffer);
+
+            // Check for RIFF header
+            if (view.getUint32(0, false) !== 0x46464952) { // "RIFF"
+                throw new Error('Not a valid WAV file - missing RIFF header');
+            }
+
+            // Find fmt chunk
+            let pos = 12; // Start after "RIFF....WAVE"
+            let sampleRate = 0, channels = 0, bitDepth = 0, duration = 0;
+
+            while (pos < arrayBuffer.byteLength) {
+                const chunkID = view.getUint32(pos, false);
+                const chunkSize = view.getUint32(pos + 4, true);
+
+                if (chunkID === 0x20746d66) { // "fmt " chunk
+                    // Audio format (should be 1 for PCM)
+                    const audioFormat = view.getUint16(pos + 8, true);
+                    channels = view.getUint16(pos + 10, true);
+                    sampleRate = view.getUint32(pos + 12, true);
+                    bitDepth = view.getUint16(pos + 22, true);
+
+                    log(`WAV Header - Sample Rate: ${sampleRate}Hz, Channels: ${channels}, Bit Depth: ${bitDepth}-bit, Format: ${audioFormat === 1 ? 'PCM' : 'Compressed'}`);
+                }
+
+                if (chunkID === 0x61746164) { // "data" chunk
+                    const dataSize = chunkSize;
+                    duration = dataSize / (sampleRate * channels * (bitDepth / 8));
+                }
+
+                pos += 8 + chunkSize;
+            }
+
+            return { sampleRate, channels, bitDepth, duration };
+        }
+
         async function analyzeRecording() {
             try {
-                log('Analyzing recorded audio...');
+                log('Analyzing recorded PCM WAV...');
                 const preset = PRESETS[state.currentPreset];
                 const blob = state.recordingBlob;
 
-                // Log the format we recorded
-                log(`Recorded blob type: ${blob.type}, size: ${blob.size} bytes`);
+                log(`Recorded blob type: ${blob.type}, size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
 
-                // Decode audio
+                // Parse WAV header
                 const arrayBuffer = await blob.arrayBuffer();
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
+                let metadata;
+                try {
+                    metadata = parseWAVHeader(arrayBuffer);
+                } catch (parseError) {
+                    log(`Warning: Could not parse WAV header: ${parseError.message}`);
+                    metadata = {
+                        sampleRate: preset.sampleRate,
+                        channels: preset.channels,
+                        bitDepth: preset.bitDepth,
+                        duration: 0
+                    };
+                }
+
+                // Also try WebAudio decode for validation
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 let audioBuffer;
                 try {
                     audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    metadata.duration = audioBuffer.duration;
+                    log(`WebAudio decode successful: ${audioBuffer.duration.toFixed(2)}s`);
                 } catch (decodeError) {
-                    log(`Warning: Could not decode audio format (${blob.type}). This may be expected for some formats.`);
-                    log(`Decode error: ${decodeError.message}`);
-
-                    // Use preset info as fallback for metadata
-                    const duration = (blob.size / (preset.sampleRate * (preset.bitDepth / 8) * preset.channels)) || 0;
-                    log(`Using preset defaults for analysis (estimated duration: ${duration.toFixed(2)}s)`);
-
-                    document.getElementById('resultDuration').textContent = `${duration.toFixed(2)}s (estimated)`;
-                    document.getElementById('resultSampleRate').textContent = formatFrequency(preset.sampleRate);
-                    document.getElementById('resultBitDepth').textContent = `${preset.bitDepth}-bit`;
-                    document.getElementById('resultChannels').textContent = preset.channels === 1 ? 'Mono' : 'Stereo';
-                    document.getElementById('fileSize').textContent = `${(blob.size / 1024).toFixed(2)} KB`;
-
-                    const validationHtml = `
-                        <div class="results-grid" style="margin-top: 15px;">
-                            <div class="result-card">
-                                <label>Format Support</label>
-                                <div class="status warning">⚠ Format validation limited</div>
-                            </div>
-                            <div class="result-card">
-                                <label>Sample Rate</label>
-                                <div class="status pass">✓ Preset match</div>
-                            </div>
-                        </div>
-                        <div class="info-box">
-                            <strong>Note:</strong> Browser recorded audio in ${blob.type} format. WebAudio API could not decode this format for detailed analysis, but the recording was created successfully. You can still download and listen to the file.
-                        </div>
-                    `;
-
-                    document.getElementById('downloadSection').innerHTML = validationHtml;
-                    document.getElementById('recordingResults').style.display = 'block';
-
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `recording-${Date.now()}.${blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'wav'}`;
-
-                    validationHtml += `
-                        <div style="text-align: center; margin-top: 20px;">
-                            <a href="${url}" download class="download-link">📥 Download Recording (${blob.type})</a>
-                        </div>
-                    `;
-
-                    document.getElementById('downloadSection').innerHTML = validationHtml;
-                    return;
+                    log(`WebAudio decode warning: ${decodeError.message} (WAV header parsing will be used)`);
                 }
 
-                // Extract metadata
-                const duration = audioBuffer.duration;
-                const sampleRate = audioBuffer.sampleRate;
-                const channels = audioBuffer.numberOfChannels;
+                // Use parsed metadata (from WAV header)
+                const duration = metadata.duration || 0;
+                const sampleRate = metadata.sampleRate;
+                const channels = metadata.channels;
+                const bitDepth = metadata.bitDepth;
 
-                // Estimate bit depth from file size (rough estimate)
-                const estimatedBitDepth = blob.size > 0 ? Math.round((blob.size * 8) / (duration * sampleRate * channels)) : 16;
-
-                // Update results
+                // Update results with WAV header values
                 document.getElementById('resultDuration').textContent = `${duration.toFixed(2)}s`;
                 document.getElementById('resultSampleRate').textContent = formatFrequency(sampleRate);
-                document.getElementById('resultBitDepth').textContent = `${estimatedBitDepth}-bit`;
+                document.getElementById('resultBitDepth').textContent = `${bitDepth}-bit`;
                 document.getElementById('resultChannels').textContent = channels === 1 ? 'Mono' : 'Stereo';
-                document.getElementById('fileSize').textContent = `${(blob.size / 1024).toFixed(2)} KB`;
+                document.getElementById('fileSize').textContent = `${(blob.size / 1024 / 1024).toFixed(2)} MB`;
 
                 // Validate against preset
                 const sampleRateMatch = sampleRate === preset.sampleRate;
+                const bitDepthMatch = bitDepth === preset.bitDepth;
                 const channelsMatch = channels === preset.channels;
                 const durationOk = duration >= preset.minDuration;
+                const isPCM = true; // RecordRTC produces PCM WAV
 
                 let validationHtml = `
                     <div class="results-grid" style="margin-top: 15px;">
                         <div class="result-card">
+                            <label>Format</label>
+                            <div class="status ${isPCM ? 'pass' : 'fail'}">
+                                ${isPCM ? '✓ Uncompressed PCM' : '✗ Compressed'}
+                            </div>
+                        </div>
+                        <div class="result-card">
                             <label>Sample Rate Match</label>
                             <div class="status ${sampleRateMatch ? 'pass' : 'fail'}">
                                 ${sampleRateMatch ? '✓ Match' : '✗ Mismatch'}
+                            </div>
+                        </div>
+                        <div class="result-card">
+                            <label>Bit Depth Match</label>
+                            <div class="status ${bitDepthMatch ? 'pass' : 'fail'}">
+                                ${bitDepthMatch ? '✓ Match' : '✗ Mismatch'}
                             </div>
                         </div>
                         <div class="result-card">
