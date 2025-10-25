@@ -9,7 +9,7 @@ import {
   formatChannels,
   formatBitDepth,
   formatDuration
-} from './format-utils';
+} from '@audio-analyzer/core';
 import type { ValidationResult } from '../types';
 
 /**

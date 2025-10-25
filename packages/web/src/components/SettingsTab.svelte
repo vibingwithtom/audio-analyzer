@@ -1,6 +1,6 @@
 <script lang="ts">
   import { availablePresets, currentPresetId, setPreset, selectedPreset, currentCriteria, updateCustomCriteria, hasValidPresetConfig, enableIncludeFailureAnalysis, setIncludeFailureAnalysis, enableIncludeRecommendations, setIncludeRecommendations, peakDetectionMode, setPeakDetectionMode } from '../stores/settings';
-  import type { AudioCriteria } from '../settings/types';
+  import type { AudioCriteria } from '@audio-analyzer/core';
 
   // Custom criteria form state
   let customFileTypes = $state<string[]>([]);

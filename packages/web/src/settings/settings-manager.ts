@@ -5,16 +5,15 @@
  * Handles criteria validation settings, presets, filename validation, and user preferences.
  */
 
+import type { PresetConfigurations } from '@audio-analyzer/core';
+import { DEFAULT_PRESETS, type PresetConfig, type AudioCriteria } from '@audio-analyzer/core';
 import type {
-  AudioCriteria,
-  PresetConfig,
-  PresetConfigurations,
   AppSettings,
   FilenameValidationSettings,
   BoxFilenameValidationSettings,
   LocalFilenameValidationSettings
 } from './types';
-import { STORAGE_KEYS, DEFAULT_PRESETS } from './types';
+import { STORAGE_KEYS } from './types';
 
 /**
  * Settings Manager Class

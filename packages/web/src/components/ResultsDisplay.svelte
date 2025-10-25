@@ -7,8 +7,7 @@
   import { analyticsService } from '../services/analytics-service';
   import type { AudioResults } from '../types';
   import { exportResultsToCsv, exportResultsEnhanced, type ExportOptions } from '../utils/export-utils';
-  import { formatDuration } from '../utils/format-utils';
-  import { computeExperimentalStatus } from '../utils/status-utils';
+  import { formatDuration, computeExperimentalStatus } from '@audio-analyzer/core';
   import { CriteriaValidator } from '@audio-analyzer/core';
 
   interface ResultsDisplayProps {

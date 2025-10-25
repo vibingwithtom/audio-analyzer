@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { analyzeAudioFile } from '../../src/services/audio-analysis-service';
-import { AudioAnalyzer, LevelAnalyzer, CriteriaValidator } from '@audio-analyzer/core';
-import { FilenameValidator } from '../../src/validation/filename-validator';
+import { AudioAnalyzer, LevelAnalyzer, CriteriaValidator, FilenameValidator } from '@audio-analyzer/core';
 
 // Mock the core modules
 vi.mock('@audio-analyzer/core', () => ({
@@ -10,18 +9,15 @@ vi.mock('@audio-analyzer/core', () => ({
   CriteriaValidator: {
     validateResults: vi.fn()
   },
+  FilenameValidator: {
+    validateBilingual: vi.fn()
+  },
   AnalysisCancelledError: class extends Error {
     constructor(message, stage) {
       super(message);
       this.name = 'AnalysisCancelledError';
       this.stage = stage;
     }
-  }
-}));
-
-vi.mock('../../src/validation/filename-validator', () => ({
-  FilenameValidator: {
-    validateBilingual: vi.fn()
   }
 }));
 

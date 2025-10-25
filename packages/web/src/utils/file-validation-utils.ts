@@ -4,7 +4,7 @@
  * Helpers for validating file types against preset criteria
  */
 
-import type { AudioCriteria } from '../settings/types';
+import type { AudioCriteria } from '@audio-analyzer/core';
 
 /**
  * Check if a file type is allowed based on criteria

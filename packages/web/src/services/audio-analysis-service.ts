@@ -1,8 +1,6 @@
-import { AudioAnalyzer, LevelAnalyzer, CriteriaValidator, AnalysisCancelledError } from '@audio-analyzer/core';
-import { FilenameValidator } from '../validation/filename-validator';
+import { AudioAnalyzer, LevelAnalyzer, CriteriaValidator, AnalysisCancelledError, FilenameValidator, type PresetConfig } from '@audio-analyzer/core';
 import type { AudioResults, ValidationResults } from '../types';
 import type { AnalysisMode } from '../stores/analysisMode';
-import type { PresetConfig } from '../settings/types';
 import { analyticsService } from './analytics-service';
 import { SettingsManager } from '../settings/settings-manager';
 import { formatRejectedFileType } from '../utils/file-validation-utils';

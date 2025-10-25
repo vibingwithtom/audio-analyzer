@@ -1,6 +1,6 @@
 import type { AudioResults } from '../types';
-import type { AudioCriteria, PresetConfig } from '../settings/types';
-import { formatDuration, formatSampleRate as formatSampleRateUI, formatBytes, formatChannels, formatBitDepth } from './format-utils';
+import type { AudioCriteria, PresetConfig } from '@audio-analyzer/core';
+import { formatDuration, formatSampleRate as formatSampleRateUI, formatBytes, formatChannels, formatBitDepth } from '@audio-analyzer/core';
 import { analyticsService } from '../services/analytics-service';
 import { CriteriaValidator } from '@audio-analyzer/core';
 

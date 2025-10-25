@@ -16,18 +16,15 @@ vi.mock('@audio-analyzer/core', () => ({
     validateStereoType: vi.fn(() => ({ status: 'pass' })),
     validateSpeechOverlap: vi.fn(() => ({ status: 'pass' }))
   },
+  FilenameValidator: {
+    validateBilingual: vi.fn(() => ({ status: 'pass' })),
+    validateThreeHour: vi.fn(() => ({ status: 'pass' }))
+  },
   AnalysisCancelledError: class extends Error {
     constructor(message, stage) {
       super(message);
       this.stage = stage;
     }
-  }
-}));
-
-vi.mock('../../src/validation/filename-validator', () => ({
-  FilenameValidator: {
-    validateBilingual: vi.fn(() => ({ status: 'pass' })),
-    validateThreeHour: vi.fn(() => ({ status: 'pass' }))
   }
 }));
 

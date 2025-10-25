@@ -6,25 +6,19 @@ import {
 } from '../utils/component-test-helpers';
 
 // Mock dependencies
-vi.mock('../../src/utils/format-utils', () => ({
+vi.mock('@audio-analyzer/core', () => ({
   formatDuration: vi.fn((d) => `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`),
   formatSampleRate: vi.fn((sr) => `${sr}Hz`),
   formatBitDepth: vi.fn((bd) => `${bd}-bit`),
   formatChannels: vi.fn((ch) => ch === 1 ? 'Mono' : 'Stereo'),
-  formatBytes: vi.fn((b) => `${(b / 1024 / 1024).toFixed(2)}MB`)
-}));
-
-vi.mock('../../src/utils/status-utils', () => ({
+  formatBytes: vi.fn((b) => `${(b / 1024 / 1024).toFixed(2)}MB`),
   computeExperimentalStatus: vi.fn((result) => result.status || 'pass'),
   getNormalizationStatus: vi.fn(() => 'pass'),
   getReverbStatus: vi.fn(() => 'pass'),
   getNoiseFloorStatus: vi.fn(() => 'pass'),
   getSilenceStatus: vi.fn(() => 'pass'),
   getClippingStatus: vi.fn(() => 'pass'),
-  getMicBleedStatus: vi.fn(() => 'pass')
-}));
-
-vi.mock('@audio-analyzer/core', () => ({
+  getMicBleedStatus: vi.fn(() => 'pass'),
   CriteriaValidator: {
     validateSpeechOverlap: vi.fn(() => ({ status: 'pass' })),
     validateStereoType: vi.fn(() => ({ status: 'pass' }))

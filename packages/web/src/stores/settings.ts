@@ -1,6 +1,6 @@
 import { writable, derived, type Readable, get } from 'svelte/store';
 import { SettingsManager } from '../settings/settings-manager';
-import type { AudioCriteria, PresetConfig } from '../settings/types';
+import type { AudioCriteria, PresetConfig } from '@audio-analyzer/core';
 import { STORAGE_KEYS } from '../settings/types';
 import { isSimplifiedMode, lockedPresetId } from './simplifiedMode';
 import { analyticsService } from '../services/analytics-service';
