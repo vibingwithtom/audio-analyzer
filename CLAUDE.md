@@ -213,19 +213,23 @@ Vanilla JS SPA built with Vite. Key files:
   - Bilingual: `[ConversationID]-[LanguageCode]-user-[UserID]-agent-[AgentID]`
 - **Batch Processing**: Google Drive folders, Box folders, local multi-file selection
 
-## Cloudflare API MCP Server
+## Cloudflare API Tools
 
-**Status:** Configured in `.mcp.json` but requires MCP SDK installation.
+**Note:** Cloudflare offers official MCP servers (Workers, Observability, Radar, etc.) but does not provide one for Pages deployments, so we have a custom solution.
 
-The Cloudflare Pages MCP server is defined in `.claude/mcp/cloudflare_mcp.py` with tools for:
-- `get_deployment_logs()` - Fetch build logs for a deployment
-- `list_deployments()` - List recent deployments
-- `get_deployment_details()` - Get deployment info
-- `retry_deployment()` - Retry a failed build
-- `list_projects()` - List all Pages projects
-- `get_project_info()` - Get project details
+### Pages Deployment Tools
 
-**Current approach:** Use the CLI tool instead (see "Cloudflare Pages Debugging" section below) as it requires no additional dependencies.
+The following tools are available in `.claude/mcp/`:
+- `cloudflare_mcp.py` - Full MCP server (requires MCP SDK, pending setup)
+- `cloudflare_fetch_logs.py` - CLI tool for debugging Pages builds (recommended, no dependencies)
+
+Both tools support:
+- Listing recent deployments
+- Fetching deployment logs and status
+- Retrieving project information
+- Retrying failed builds
+
+**Use the CLI tool** (see "Cloudflare Pages Debugging" section below) as it requires no additional setup.
 
 ---
 
