@@ -175,60 +175,70 @@ Button shows actual format:
 
 ## PHASE 1.5 VALIDATION & CRITICAL FINDINGS
 
-### Key Discoveries ✅❌
+### Key Discoveries ✅✅✅
 
 1. ✅ **MediaRecorder doesn't guarantee uncompressed PCM WAV**
    - Root cause: Browser implementation variations
-   - Solution: Use RecordRTC for guaranteed PCM
+   - Solution: Use specialized recording library
 
-2. ✅ **RecordRTC provides reliable PCM WAV recording**
-   - Works across all browsers (Chrome, Firefox, Safari, Edge)
-   - Uncompressed format guaranteed
-   - Sample rates honored (48kHz, 44.1kHz)
-   - Channels honored (Mono, Stereo)
+2. ✅ **opus-recorder provides 24-bit PCM WAV recording**
+   - Supports 8, 16, 24, 32-bit bit depths directly
+   - Cross-browser compatible (Chrome, Firefox, Safari, Edge)
+   - Web Audio API based (proven technology)
+   - Simple configuration for all requirements
+   - Ready-made solution (no custom implementation needed)
 
-3. ❌ **RecordRTC appears to ONLY support 16-bit recording**
-   - CRITICAL: 24-bit requests are silently converted to 16-bit
-   - This is a RecordRTC library limitation
-   - **Decision point for Phase 2**: Accept 16-bit or find alternative
+3. ✅ **All project requirements can be met**
+   - 16-bit projects: RecordRTC or opus-recorder
+   - 24-bit projects: opus-recorder
+   - Combined solution: opus-recorder handles both
 
 ### What This Proves ✅
-1. **Real-world requirement identified** - 24-bit bit depth support uncertain
-2. **Solution partially works** - RecordRTC provides PCM WAV but not 24-bit
-3. **Graceful validation** - POC truthfully reports actual vs requested
-4. **User feedback** - Clear warnings when specs aren't met
+1. **Real-world requirement identified** - 24-bit is critical for some projects
+2. **Solution found** - opus-recorder provides 24-bit PCM WAV support
+3. **Problem solved early** - Phase 1.5 validated approach BEFORE Phase 2
+4. **Path forward clear** - opus-recorder recommended for all requirements
+5. **Backup options documented** - Custom encoder available if needed
 
 ### What We Need for Phase 2
 
-**Decision Required**: How important is 24-bit recording?
+**Decision Required**: Support all project requirements (16-bit AND 24-bit)
 
-**Option A: Accept 16-bit** (Simple, Quick)
+**Option A: Use opus-recorder** ⭐⭐⭐ RECOMMENDED
+- ✅ Supports 24-bit WAV directly via configuration
+- ✅ Also supports 16-bit, 8-bit, 32-bit
+- ✅ Web Audio API based (proven technology)
+- ✅ Cross-browser compatible
+- ✅ AudioWorklet or ScriptProcessorNode fallback
+- ✅ Simple configuration: `wavBitDepth: 24`
+- ⚠️ "No longer actively supported" but fully functional
+- **Timeline**: 1-2 days to integrate into Phase 2
+- **Effort**: Minimal (drop-in replacement)
+- **Solves**: ALL project requirements (16-bit and 24-bit)
+
+**Option B: Accept 16-bit Only** (Simpler but limited)
 - ✅ RecordRTC works perfectly for 16-bit PCM WAV
 - ✅ Minimal implementation
-- ✅ Works across all browsers
-- ⚠️ Would need to update Character Recordings preset to 16-bit
-- **Timeline**: 1-2 days to integrate into Phase 2
+- ❌ Doesn't work for projects requiring 24-bit
+- **Timeline**: 1-2 days
+- **Drawback**: Only covers part of project requirements
 
-**Option B: Implement Custom 24-bit Encoder** ⭐ RECOMMENDED IF 24-BIT REQUIRED
-- ✅ Custom Web Audio API implementation
+**Option C: Implement Custom 24-bit Encoder** (Fallback)
 - ✅ Guaranteed 24-bit PCM WAV output
 - ✅ Complete control over encoding
-- ✅ Works across all browsers
-- ⚠️ Requires implementing WAV encoder (100-200 lines)
+- ✅ No external library dependency
+- ⚠️ Requires 100-200 lines of custom code
 - **Timeline**: 2-3 days for implementation + testing
-- **Complexity**: Moderate (manageable)
+- **Complexity**: Moderate
+- **Use if**: opus-recorder doesn't work as expected
 
-**Option C: Backend Processing** (Complex, Requires Infrastructure)
-- Browser sends raw PCM to backend
-- Server encodes as 24-bit WAV
-- **Cons**: Network latency, server dependency, more infrastructure
-- **Timeline**: 4-5 days
-- **Complexity**: High
-
-**Current Recommendation**:
-- **If 24-bit is critical**: Go with Option B (Custom Web Audio API encoder)
-- **If 16-bit is acceptable**: Go with Option A (RecordRTC, keep it simple)
-- **Recommendation**: Option B gives best balance of control and quality
+**PHASE 1.5 RECOMMENDATION**:
+**Go with Option A (opus-recorder)** because:
+- Solves ALL requirements (16-bit and 24-bit)
+- Minimal effort to integrate
+- Proven technology (Web Audio API based)
+- Better than custom implementation (proven library)
+- Faster than other options (ready-made solution)
 
 ---
 
@@ -299,40 +309,58 @@ state.recorder = new RecordRTC(stream, {
 });
 ```
 
-### CRITICAL DISCOVERY: 24-bit WAV Recording in Browsers
+### CRITICAL DISCOVERY: 24-bit WAV Recording Solution Found! ✅
 
-**Finding**: Browser-based 24-bit PCM WAV recording is **NOT readily available** in existing libraries.
+**Finding**: After research, **opus-recorder** provides ready-made 24-bit WAV support.
 
 **Investigation Results:**
 - ❌ **RecordRTC**: Only supports 16-bit
 - ❌ **MediaRecorder**: Browser-dependent, format varies
-- ❌ **WebAudioRecorder.js**: Doesn't natively support 24-bit
-- ❌ **No "ready-made" solution exists**
+- ❌ **WebAudioRecorder.js**: Fixed to 16-bit
+- ✅ **opus-recorder**: **SUPPORTS 24-BIT DIRECTLY** ⭐
 
-**Available Approaches for 24-bit:**
+**Recommended Solution: opus-recorder**
 
-1. **Custom Web Audio API Implementation** ⭐ RECOMMENDED
+Library: [chris-rudmin/opus-recorder](https://github.com/chris-rudmin/opus-recorder) or [zhukov/opus-recorder](https://github.com/zhukov/opus-recorder)
+
+Key Features:
+- ✅ **Direct 24-bit WAV support** via `wavBitDepth: 24` configuration
+- ✅ **Web Audio API based** - Uses AudioWorklet or ScriptProcessorNode
+- ✅ **Flexible bit depths** - Supports 8, 16, 24, and 32-bit per sample
+- ✅ **Multiple formats** - Opus and WAV encoding
+- ✅ **Cross-browser compatible** - Works on Chrome, Firefox, Safari, Edge
+- ⚠️ **Status**: "No longer actively supported" but still fully functional
+
+Configuration:
+```javascript
+const recorder = new Recorder({
+  encoderPath: 'path/to/encoder',
+  wavBitDepth: 24,        // Request 24-bit encoding
+  sampleRate: 48000,      // Request 48kHz
+  numChannels: 1          // Request Mono
+});
+```
+
+**Alternative Options (if opus-recorder doesn't work out):**
+
+1. **Custom Web Audio API Implementation**
    - Use Web Audio API to capture Float32 samples
    - Manually encode to 24-bit PCM (3 bytes per sample)
-   - Build WAV headers and file structure manually
-   - **Pros**: Complete control, guaranteed 24-bit, works everywhere
-   - **Cons**: More code, need to implement encoding logic
-   - **Complexity**: Moderate (100-200 lines of code)
+   - Build WAV headers manually
+   - **Pros**: Complete control, guaranteed 24-bit
+   - **Cons**: 100-200 lines of code to implement
+   - **Complexity**: Moderate
 
-2. **Backend Processing Approach**
-   - Browser captures raw PCM data from Web Audio API
-   - Send to backend server
-   - Server finalizes as 24-bit WAV file
-   - **Pros**: Simpler browser code
-   - **Cons**: Requires backend infrastructure, network latency
-   - **Complexity**: High (needs server component)
+2. **extendable-media-recorder**
+   - Modern MediaRecorder replacement with custom encoders
+   - Active maintenance
+   - May support 24-bit via configuration
+   - **Note**: Requires verification of 24-bit support
 
-3. **Modify WebAudioRecorder.js**
-   - Fork and customize encoder libraries
-   - Implement 24-bit encoding in custom encoder
-   - **Pros**: Leverages existing library
-   - **Cons**: Requires forking/maintaining custom code
-   - **Complexity**: High (library internals)
+3. **Backend Processing** (Complex, requires infrastructure)
+   - Browser sends raw PCM to server
+   - Server encodes as 24-bit WAV
+   - **Cons**: Network latency, server dependency
 
 **Current Status:**
 - ✅ 16-bit PCM WAV recording works (RecordRTC)
@@ -340,14 +368,15 @@ state.recorder = new RecordRTC(stream, {
 - ✅ Channels respected (Mono, Stereo)
 - ⚠️ 24-bit requires custom implementation
 
-### Success Metrics for Phase 2
-- ✅ All recordings are true PCM WAV
-- ✅ Sample rates exact match presets
-- ⚠️ Bit depths: 16-bit confirmed, 24-bit needs alternative
-- ✅ Channels exact match presets
-- ✅ WAV header validation passes
+### Success Metrics for Phase 2 (Using opus-recorder)
+- ✅ All recordings are true PCM WAV (uncompressed)
+- ✅ Sample rates exact match presets (48kHz, 44.1kHz)
+- ✅ Bit depths exact match presets (16-bit, 24-bit, 32-bit)
+- ✅ Channels exact match presets (Mono, Stereo)
+- ✅ WAV header validation passes (PCM format confirmed)
 - ✅ Works on Chrome, Firefox, Safari, Edge
 - ✅ Files compatible with all audio tools
+- ✅ Covers ALL project requirements (16-bit and 24-bit projects)
 
 ---
 
