@@ -940,7 +940,7 @@
 
             // Find fmt chunk
             let pos = 12; // Start after "RIFF....WAVE"
-            let sampleRate = 0, channels = 0, bitDepth = 0, duration = 0;
+            let sampleRate = 0, channels = 0, bitDepth = 0, duration = 0, audioFormat = 0;
 
             while (pos < arrayBuffer.byteLength) {
                 const chunkID = view.getUint32(pos, false);
@@ -948,12 +948,10 @@
 
                 if (chunkID === 0x20746d66) { // "fmt " chunk
                     // Audio format (should be 1 for PCM)
-                    const audioFormat = view.getUint16(pos + 8, true);
+                    audioFormat = view.getUint16(pos + 8, true);
                     channels = view.getUint16(pos + 10, true);
                     sampleRate = view.getUint32(pos + 12, true);
                     bitDepth = view.getUint16(pos + 22, true);
-
-                    log(`WAV Header - Sample Rate: ${sampleRate}Hz, Channels: ${channels}, Bit Depth: ${bitDepth}-bit, Format: ${audioFormat === 1 ? 'PCM' : 'Compressed'}`);
                 }
 
                 if (chunkID === 0x61746164) { // "data" chunk
@@ -964,7 +962,7 @@
                 pos += 8 + chunkSize;
             }
 
-            return { sampleRate, channels, bitDepth, duration };
+            return { audioFormat, sampleRate, channels, bitDepth, duration };
         }
 
         async function analyzeRecording() {
@@ -981,6 +979,17 @@
                 let metadata;
                 try {
                     metadata = parseWAVHeader(arrayBuffer);
+                    log(`🔍 WAV Header Analysis:`);
+                    log(`   - Audio Format: ${metadata.audioFormat === 1 ? 'PCM' : 'Compressed/Unknown'}`);
+                    log(`   - Sample Rate (actual): ${metadata.sampleRate}Hz`);
+                    log(`   - Channels (actual): ${metadata.channels}`);
+                    log(`   - Bit Depth (actual): ${metadata.bitDepth}-bit`);
+
+                    // CRITICAL: Check if RecordRTC ignored our bit depth request
+                    if (metadata.bitDepth !== preset.bitDepth) {
+                        log(`⚠️ CRITICAL: Preset requested ${preset.bitDepth}-bit but file is ${metadata.bitDepth}-bit!`);
+                        log(`   RecordRTC may not support requested bit depth.`);
+                    }
                 } catch (parseError) {
                     log(`Warning: Could not parse WAV header: ${parseError.message}`);
                     metadata = {
@@ -1020,7 +1029,7 @@
                 const bitDepthMatch = bitDepth === preset.bitDepth;
                 const channelsMatch = channels === preset.channels;
                 const durationOk = duration >= preset.minDuration;
-                const isPCM = true; // RecordRTC produces PCM WAV
+                const isPCM = metadata.audioFormat === 1; // Verify it's actually PCM
 
                 let validationHtml = `
                     <div class="results-grid" style="margin-top: 15px;">
@@ -1031,31 +1040,41 @@
                             </div>
                         </div>
                         <div class="result-card">
-                            <label>Sample Rate Match</label>
+                            <label>Sample Rate</label>
                             <div class="status ${sampleRateMatch ? 'pass' : 'fail'}">
-                                ${sampleRateMatch ? '✓ Match' : '✗ Mismatch'}
+                                ${sampleRateMatch ? `✓ ${sampleRate}Hz` : `✗ ${sampleRate}Hz (wanted ${preset.sampleRate}Hz)`}
                             </div>
                         </div>
                         <div class="result-card">
-                            <label>Bit Depth Match</label>
+                            <label>Bit Depth</label>
                             <div class="status ${bitDepthMatch ? 'pass' : 'fail'}">
-                                ${bitDepthMatch ? '✓ Match' : '✗ Mismatch'}
+                                ${bitDepthMatch ? `✓ ${bitDepth}-bit` : `⚠️ ${bitDepth}-bit (wanted ${preset.bitDepth}-bit)`}
                             </div>
                         </div>
                         <div class="result-card">
-                            <label>Channels Match</label>
+                            <label>Channels</label>
                             <div class="status ${channelsMatch ? 'pass' : 'fail'}">
-                                ${channelsMatch ? '✓ Match' : '✗ Mismatch'}
+                                ${channelsMatch ? `✓ ${channels === 1 ? 'Mono' : 'Stereo'}` : `✗ ${channels} (wanted ${preset.channels})`}
                             </div>
                         </div>
                         <div class="result-card">
-                            <label>Duration Check</label>
+                            <label>Duration</label>
                             <div class="status ${durationOk ? 'pass' : 'fail'}">
-                                ${durationOk ? '✓ OK' : '✗ Too Short'}
+                                ${durationOk ? `✓ ${duration.toFixed(2)}s` : `✗ ${duration.toFixed(2)}s (min ${preset.minDuration}s)`}
                             </div>
                         </div>
                     </div>
                 `;
+
+                // Add warning if bit depth doesn't match
+                if (!bitDepthMatch) {
+                    validationHtml += `
+                        <div class="info-box" style="border-left-color: #f59e0b; background: #fffbeb;">
+                            <strong>⚠️ Bit Depth Note:</strong> RecordRTC recorded at ${bitDepth}-bit instead of requested ${preset.bitDepth}-bit.
+                            This may be a library limitation. Check Phase 1.5 findings for details.
+                        </div>
+                    `;
+                }
 
                 // Add download link
                 const url = URL.createObjectURL(blob);
