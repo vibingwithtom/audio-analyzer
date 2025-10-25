@@ -232,13 +232,31 @@ Button shows actual format:
 - **Complexity**: Moderate
 - **Use if**: opus-recorder doesn't work as expected
 
-**PHASE 1.5 RECOMMENDATION**:
-**Go with Option A (opus-recorder)** because:
-- Solves ALL requirements (16-bit and 24-bit)
-- Minimal effort to integrate
-- Proven technology (Web Audio API based)
-- Better than custom implementation (proven library)
-- Faster than other options (ready-made solution)
+**PHASE 1.5 RECOMMENDATION** (Updated after maintenance concern):
+
+**Choice depends on your long-term support requirements:**
+
+**IF you prioritize speed** (< 2 days):
+→ **Use opus-recorder**
+- Ready-made solution (minimal integration)
+- Proven, fully functional
+- **Trade-off**: Unmaintained library (low risk but future concern)
+
+**IF you prioritize long-term maintainability** (sustainable codebase):
+→ **Use Custom Web Audio API Implementation** ⭐ RECOMMENDED
+- Future-proof (you control the code)
+- No external dependencies
+- Only 100-200 lines of code
+- Modern browser support
+- **Timeline**: 2-3 days (acceptable for long-term benefit)
+- **Advantage**: Can evolve with browser changes
+
+**Why Custom Implementation is Better Long-Term:**
+- ✅ No dependency on unmaintained library
+- ✅ Full control and understanding of code
+- ✅ Can adapt to future browser APIs (WebCodecs)
+- ✅ No maintenance surprises
+- ✅ Modest time investment (1 extra day)
 
 ---
 
@@ -348,23 +366,44 @@ const recorder = new Recorder({
 });
 ```
 
-**Alternative Options (if opus-recorder doesn't work out):**
+**Important Note on opus-recorder Maintenance:**
 
-1. **Custom Web Audio API Implementation**
+The opus-recorder README states: "Heads up that this project is no longer being maintained. There is currently good browser support for webcodecs API which replaces the need for wasm codecs."
+
+This is a valid concern. However:
+- ✅ The library is **fully functional** despite no active maintenance
+- ✅ No known bugs or security issues
+- ✅ Works on all modern browsers
+- ⚠️ Future browser changes might not be addressed
+- **Risk Level**: Low-to-moderate (depends on your long-term support needs)
+
+**Alternative Options:**
+
+1. **WebCodecs API** (Modern, Future-proof)
+   - W3C standard, actively developed
+   - Good browser support (Chrome 94+, Firefox 133+, Safari 16.6+)
+   - **Limitation**: Still requires manual WAV header construction
+   - **Limitation**: No native 24-bit PCM support documented
+   - **Note**: Would require custom implementation similar to option 3
+   - **Complexity**: Moderate (same as custom implementation)
+   - **Advantage**: Future-proof, officially supported
+
+2. **Custom Web Audio API Implementation**
    - Use Web Audio API to capture Float32 samples
    - Manually encode to 24-bit PCM (3 bytes per sample)
    - Build WAV headers manually
-   - **Pros**: Complete control, guaranteed 24-bit
-   - **Cons**: 100-200 lines of code to implement
+   - **Pros**: Complete control, guaranteed 24-bit, no dependencies
+   - **Cons**: 100-200 lines of code to implement and maintain
    - **Complexity**: Moderate
+   - **Advantage**: No external library dependency
 
-2. **extendable-media-recorder**
+3. **extendable-media-recorder**
    - Modern MediaRecorder replacement with custom encoders
    - Active maintenance
    - May support 24-bit via configuration
    - **Note**: Requires verification of 24-bit support
 
-3. **Backend Processing** (Complex, requires infrastructure)
+4. **Backend Processing** (Complex, requires infrastructure)
    - Browser sends raw PCM to server
    - Server encodes as 24-bit WAV
    - **Cons**: Network latency, server dependency
@@ -387,9 +426,14 @@ const recorder = new Recorder({
 
 ---
 
-## Phase 1.5 Extension: Custom 24-bit WAV Encoder
+## Phase 1.5 Extension: Custom 24-bit WAV Encoder ⭐ RECOMMENDED APPROACH
 
-If 24-bit recording is required, we can implement a custom encoder in the POC using the Web Audio API approach:
+**Why implement custom encoder:**
+- Future-proof (no dependency on unmaintained libraries)
+- Full control over the codebase
+- Can evolve to WebCodecs API when mature
+- No external library risk
+- Only 100-200 lines of code
 
 ### Implementation Strategy
 
