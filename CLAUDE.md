@@ -162,6 +162,29 @@ npm run deploy:beta      # Deploys to https://audio-analyzer.tinytech.site/beta/
 
 **Note:** See `packages/web/DEPLOYMENT.md` for detailed deployment guide.
 
+### Using the Cloudflare CLI Tool
+
+**Environment variables required:**
+```bash
+export CLOUDFLARE_API_TOKEN="your-api-token"
+export CLOUDFLARE_ACCOUNT_ID="your-account-id"
+```
+These are already in `.zshrc` but may need to be added to other shells.
+
+**Monitor Cloudflare Pages builds:**
+```bash
+# List recent deployments with status
+python3 .claude/mcp/cloudflare_fetch_logs.py audio-analyzer
+
+# Get detailed logs for a specific deployment
+python3 .claude/mcp/cloudflare_fetch_logs.py audio-analyzer <deployment-id> detailed
+
+# Get concise summary (errors and last logs)
+python3 .claude/mcp/cloudflare_fetch_logs.py audio-analyzer <deployment-id> concise
+```
+
+Use this to debug build failures - the tool fetches logs directly from Cloudflare API for the audio-analyzer Pages project. No dependencies required.
+
 ## Architecture
 
 ### Monorepo Structure

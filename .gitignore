@@ -48,3 +48,10 @@ coverage/
 # Local settings
 .claude/settings.local.json
 .gemini/
+
+# Cloudflare Pages build artifacts
+.wrangler/
+dist/
+build/
+*.wrangler-cache/
+wrangler.lock
