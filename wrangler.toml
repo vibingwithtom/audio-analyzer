@@ -8,9 +8,8 @@ compatibility_date = "2025-10-24"
 
 [build]
 command = "npm run build --workspace=@audio-analyzer/web"
+destination = "packages/web/dist"
 watch_paths = ["packages/web/src/**/*.{ts,js,svelte}"]
-root_dir = "packages/web"
-output_dir = "dist"
 
 [env.production]
 name = "audio-analyzer"
